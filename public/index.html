@@ -33,16 +33,12 @@
       inset: 0;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.65s ease, filter 0.75s ease, transform 0.75s ease;
-      filter: blur(12px);
-      transform: scale(1.015);
+      transition: opacity 0.45s ease;
     }
 
     .screen.visible {
       opacity: 1;
       pointer-events: auto;
-      filter: blur(0);
-      transform: scale(1);
     }
 
     .standby {
@@ -128,13 +124,12 @@
       background: white;
       max-width: 100%;
       max-height: 100%;
-      transition: opacity 0.45s ease, transform 0.45s ease, filter 0.45s ease;
+      opacity: 1;
+      transition: opacity 0.3s ease;
     }
 
     .page-wrap.loading {
-      opacity: 0.2;
-      transform: scale(0.985);
-      filter: blur(10px);
+      opacity: 0.15;
     }
 
     #pdfCanvas {
@@ -385,7 +380,6 @@
     let currentVersion = null;
     let isSending = false;
     let currentMode = null;
-    let currentSession = null;
 
     let pdfDocRef = null;
     let currentPageIndex = 0;
@@ -398,7 +392,6 @@
       successOverlay.classList.remove("visible");
       currentVersion = null;
       currentMode = null;
-      currentSession = null;
       pdfDocRef = null;
       overlaysByPage = [];
       currentPageIndex = 0;
@@ -508,10 +501,12 @@
       item.hasSignature = false;
     }
 
-    async function renderCurrentPage() {
+    async function renderCurrentPage(withFade = false) {
       if (!pdfDocRef) return;
 
-      pageWrap.classList.add("loading");
+      if (withFade) {
+        pageWrap.classList.add("loading");
+      }
 
       const page = await pdfDocRef.getPage(currentPageIndex + 1);
       const viewport = page.getViewport({ scale: 1 });
@@ -540,9 +535,11 @@
       setupOverlayCanvas(vp.width, vp.height);
       updatePageIndicator();
 
-      setTimeout(() => {
-        pageWrap.classList.remove("loading");
-      }, 80);
+      if (withFade) {
+        setTimeout(() => {
+          pageWrap.classList.remove("loading");
+        }, 60);
+      }
     }
 
     async function loadPdfDocument(url) {
@@ -555,8 +552,8 @@
       currentPageIndex = 0;
 
       setTimeout(async () => {
-        await renderCurrentPage();
-      }, 220);
+        await renderCurrentPage(true);
+      }, 180);
     }
 
     async function loadPdf(force = false) {
@@ -573,13 +570,12 @@
 
         currentVersion = data.version;
         currentMode = data.mode;
-        currentSession = data.session || null;
         updateModeUi();
         showActive();
 
         setTimeout(async () => {
           await loadPdfDocument(data.file + "?v=" + data.version);
-        }, 260);
+        }, 220);
       } catch (err) {
         console.error("Fehler beim Laden der PDF:", err);
         showStandby();
@@ -628,14 +624,14 @@
       if (!pdfDocRef || currentPageIndex <= 0) return;
       saveCurrentOverlay();
       currentPageIndex -= 1;
-      await renderCurrentPage();
+      await renderCurrentPage(false);
     });
 
     nextPageBtn.addEventListener("click", async () => {
       if (!pdfDocRef || currentPageIndex >= pdfDocRef.numPages - 1) return;
       saveCurrentOverlay();
       currentPageIndex += 1;
-      await renderCurrentPage();
+      await renderCurrentPage(false);
     });
 
     clearBtn.addEventListener("click", () => {
