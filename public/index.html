@@ -31,14 +31,18 @@
     .screen {
       position: absolute;
       inset: 0;
-      transition: opacity 0.45s ease;
       opacity: 0;
       pointer-events: none;
+      transition: opacity 0.65s ease, filter 0.75s ease, transform 0.75s ease;
+      filter: blur(12px);
+      transform: scale(1.015);
     }
 
     .screen.visible {
       opacity: 1;
       pointer-events: auto;
+      filter: blur(0);
+      transform: scale(1);
     }
 
     .standby {
@@ -124,6 +128,13 @@
       background: white;
       max-width: 100%;
       max-height: 100%;
+      transition: opacity 0.45s ease, transform 0.45s ease, filter 0.45s ease;
+    }
+
+    .page-wrap.loading {
+      opacity: 0.2;
+      transform: scale(0.985);
+      filter: blur(10px);
     }
 
     #pdfCanvas {
@@ -154,11 +165,18 @@
       cursor: pointer;
       z-index: 3;
       backdrop-filter: blur(8px);
+      transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+    }
+
+    .nav-arrow:hover {
+      background: rgba(255,255,255,0.18);
+      transform: translateY(-50%) scale(1.03);
     }
 
     .nav-arrow:disabled {
       opacity: 0.28;
       cursor: default;
+      transform: translateY(-50%);
     }
 
     .nav-left {
@@ -311,7 +329,7 @@
       <div class="pdf-stage" id="pdfStage">
         <button id="prevPageBtn" class="nav-arrow nav-left">‹</button>
 
-        <div class="page-wrap">
+        <div class="page-wrap" id="pageWrap">
           <canvas id="pdfCanvas"></canvas>
           <canvas id="signatureOverlay"></canvas>
         </div>
@@ -362,6 +380,7 @@
     const prevPageBtn = document.getElementById("prevPageBtn");
     const nextPageBtn = document.getElementById("nextPageBtn");
     const pdfStage = document.getElementById("pdfStage");
+    const pageWrap = document.getElementById("pageWrap");
 
     let currentVersion = null;
     let isSending = false;
@@ -492,6 +511,8 @@
     async function renderCurrentPage() {
       if (!pdfDocRef) return;
 
+      pageWrap.classList.add("loading");
+
       const page = await pdfDocRef.getPage(currentPageIndex + 1);
       const viewport = page.getViewport({ scale: 1 });
 
@@ -518,16 +539,24 @@
 
       setupOverlayCanvas(vp.width, vp.height);
       updatePageIndicator();
+
+      setTimeout(() => {
+        pageWrap.classList.remove("loading");
+      }, 80);
     }
 
     async function loadPdfDocument(url) {
+      pageWrap.classList.add("loading");
       pdfDocRef = await pdfjsLib.getDocument(url).promise;
       overlaysByPage = Array.from({ length: pdfDocRef.numPages }, () => ({
         image: null,
         hasSignature: false
       }));
       currentPageIndex = 0;
-      await renderCurrentPage();
+
+      setTimeout(async () => {
+        await renderCurrentPage();
+      }, 220);
     }
 
     async function loadPdf(force = false) {
@@ -547,7 +576,10 @@
         currentSession = data.session || null;
         updateModeUi();
         showActive();
-        await loadPdfDocument(data.file + "?v=" + data.version);
+
+        setTimeout(async () => {
+          await loadPdfDocument(data.file + "?v=" + data.version);
+        }, 260);
       } catch (err) {
         console.error("Fehler beim Laden der PDF:", err);
         showStandby();
