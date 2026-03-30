@@ -5,6 +5,7 @@ const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const https = require("https");
 const { Resend } = require("resend");
 const { PDFDocument } = require("pdf-lib");
 
@@ -190,6 +191,7 @@ function readStatus(screen) {
       lastSignedAt: null,
       lastSignedName: null,
       lastSignedFile: null,
+      lastDropboxPath: null,
     };
   }
 
@@ -204,6 +206,7 @@ function readStatus(screen) {
       lastSignedAt: null,
       lastSignedName: null,
       lastSignedFile: null,
+      lastDropboxPath: null,
     };
   }
 }
@@ -296,7 +299,7 @@ async function createSignedPdf(originalPdfPath, overlays, outputPdfPath) {
   fs.writeFileSync(outputPdfPath, signedPdfBytes);
 }
 
-function buildMailContent(session, currentPdf, screen) {
+function buildMailContent(session, currentPdf, screen, dropboxPath = null) {
   const screenLabel = getScreenLabel(screen);
   const now = new Date().toLocaleString("de-DE");
 
@@ -313,6 +316,7 @@ function buildMailContent(session, currentPdf, screen) {
         <p><strong>KFZ-Kennzeichen:</strong> ${session.plate}</p>
         <p><strong>Zeit:</strong> ${now}</p>
         <p><strong>Datei:</strong> ${currentPdf}</p>
+        ${dropboxPath ? `<p><strong>Dropbox:</strong> ${dropboxPath}</p>` : ""}
       `,
     };
   }
@@ -329,6 +333,7 @@ function buildMailContent(session, currentPdf, screen) {
         <p><strong>Grund:</strong> ${session.reason}</p>
         <p><strong>Zeit:</strong> ${now}</p>
         <p><strong>Datei:</strong> ${currentPdf}</p>
+        ${dropboxPath ? `<p><strong>Dropbox:</strong> ${dropboxPath}</p>` : ""}
       `,
     };
   }
@@ -340,8 +345,105 @@ function buildMailContent(session, currentPdf, screen) {
       <p><strong>Screen:</strong> ${screenLabel}</p>
       <p><strong>Zeit:</strong> ${now}</p>
       <p><strong>Datei:</strong> ${currentPdf}</p>
+      ${dropboxPath ? `<p><strong>Dropbox:</strong> ${dropboxPath}</p>` : ""}
     `,
   };
+}
+
+function sanitizeFilePart(value, fallback = "unbekannt") {
+  const cleaned = String(value || "")
+    .trim()
+    .replace(/[^\p{L}\p{N}\-_ ]/gu, "")
+    .replace(/\s+/g, "_");
+
+  return cleaned || fallback;
+}
+
+function buildDropboxFilename(session) {
+  const now = new Date();
+  const ts = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+    "-",
+    String(now.getHours()).padStart(2, "0"),
+    String(now.getMinutes()).padStart(2, "0"),
+    String(now.getSeconds()).padStart(2, "0"),
+  ].join("");
+
+  const safeName = sanitizeFilePart(session?.name, "unbekannt");
+  const safePlate = sanitizeFilePart(session?.plate, "ohne_Kennzeichen");
+
+  return `${safeName}__${safePlate}__${ts}.pdf`;
+}
+
+function uploadFileToDropbox(localFilePath, dropboxFileName) {
+  return new Promise((resolve, reject) => {
+    const accessToken = process.env.DROPBOX_ACCESS_TOKEN;
+    if (!accessToken) {
+      return resolve(null);
+    }
+
+    const folder = String(process.env.DROPBOX_FOLDER || "/Kiosk-Signaturen").trim();
+    const normalizedFolder = folder.startsWith("/") ? folder : `/${folder}`;
+    const dropboxPath = `${normalizedFolder}/${dropboxFileName}`.replace(/\/+/g, "/");
+
+    const fileBuffer = fs.readFileSync(localFilePath);
+
+    const apiArg = JSON.stringify({
+      path: dropboxPath,
+      mode: "overwrite",
+      autorename: false,
+      mute: false,
+      strict_conflict: false,
+    });
+
+    const req = https.request(
+      {
+        hostname: "content.dropboxapi.com",
+        path: "/2/files/upload",
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Dropbox-API-Arg": apiArg,
+          "Content-Type": "application/octet-stream",
+          "Content-Length": fileBuffer.length,
+        },
+      },
+      (res) => {
+        let body = "";
+
+        res.on("data", (chunk) => {
+          body += chunk.toString("utf8");
+        });
+
+        res.on("end", () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            try {
+              const parsed = body ? JSON.parse(body) : {};
+              resolve({
+                path: parsed.path_display || dropboxPath,
+                id: parsed.id || null,
+                rev: parsed.rev || null,
+              });
+            } catch {
+              resolve({ path: dropboxPath });
+            }
+          } else {
+            reject(
+              new Error(
+                `Dropbox-Upload fehlgeschlagen (${res.statusCode || "?"}): ${body || "keine Details"}`
+              )
+            );
+          }
+        });
+      }
+    );
+
+    req.on("error", (err) => reject(err));
+    req.write(fileBuffer);
+    req.end();
+  });
 }
 
 // Admin/Login
@@ -437,6 +539,7 @@ app.get("/api/status", requireAdminAuth, (req, res) => {
     lastSignedAt: currentStatus.lastSignedAt || null,
     lastSignedName: currentStatus.lastSignedName || null,
     lastSignedFile: currentStatus.lastSignedFile || null,
+    lastDropboxPath: currentStatus.lastDropboxPath || null,
     screen,
   });
 });
@@ -584,7 +687,18 @@ app.post("/api/sign", async (req, res) => {
 
     await createSignedPdf(originalPdfPath, overlays, signedPdfPath);
 
-    const mailContent = buildMailContent(session, currentPdf, screen);
+    let dropboxResult = null;
+    if (process.env.DROPBOX_ACCESS_TOKEN) {
+      const dropboxFileName = buildDropboxFilename(session);
+      dropboxResult = await uploadFileToDropbox(signedPdfPath, dropboxFileName);
+    }
+
+    const mailContent = buildMailContent(
+      session,
+      currentPdf,
+      screen,
+      dropboxResult?.path || null
+    );
 
     const result = await resend.emails.send({
       from: process.env.MAIL_FROM,
@@ -618,6 +732,7 @@ app.post("/api/sign", async (req, res) => {
       lastSignedAt: new Date().toISOString(),
       lastSignedName: session?.name || "Unbekannt",
       lastSignedFile: currentPdf,
+      lastDropboxPath: dropboxResult?.path || null,
     });
 
     clearSession(screen);
@@ -625,6 +740,7 @@ app.post("/api/sign", async (req, res) => {
     return res.json({
       success: true,
       emailId: result.data?.id || null,
+      dropboxPath: dropboxResult?.path || null,
       screen,
     });
   } catch (error) {
