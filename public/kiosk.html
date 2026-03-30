@@ -18,7 +18,6 @@
       --danger-dark:#b91c1c;
       --secondary:#374151;
       --secondary-dark:#1f2937;
-      --success:#16a34a;
     }
 
     *{
@@ -99,7 +98,6 @@
       display:none !important;
     }
 
-    /* STANDBY */
     .standby{
       position:absolute;
       inset:0;
@@ -149,7 +147,6 @@
       letter-spacing:2px;
     }
 
-    /* LIVE */
     .live{
       position:absolute;
       inset:0;
@@ -571,6 +568,10 @@
       msg.textContent = "";
     }
 
+    function isSignMode() {
+      return currentMode === "mode1" || currentMode === "mode3";
+    }
+
     function showStandby() {
       standbyView.classList.remove("hidden");
       liveView.classList.add("hidden");
@@ -607,7 +608,6 @@
         mode1Fields.classList.remove("hidden");
         signActions.classList.remove("hidden");
         modeHint.textContent = "Bitte prüfen Sie das Dokument und unterschreiben Sie auf den Seiten.";
-
         nameInput.value = session?.name || "";
         emailInput.value = session?.email || "";
         phoneInput.value = session?.phone || "";
@@ -615,7 +615,6 @@
         mode3Fields.classList.remove("hidden");
         signActions.classList.remove("hidden");
         modeHint.textContent = "Bitte prüfen Sie das Dokument und unterschreiben Sie auf den Seiten.";
-
         name3Input.value = session?.name || "";
         reasonInput.value = session?.reason || "";
       } else {
@@ -628,7 +627,6 @@
     function updatePageIndicator() {
       const total = pdfDoc ? pdfDoc.numPages : 1;
       pageIndicator.textContent = `Seite ${currentPage} / ${total}`;
-
       prevBtn.disabled = currentPage <= 1;
       nextBtn.disabled = currentPage >= total;
     }
@@ -760,32 +758,31 @@
         overlayCanvas
       };
 
-const wrap = document.createElement("div");
-wrap.className = "page-canvas-wrap";
-wrap.style.width = viewport.width + "px";
-wrap.style.height = viewport.height + "px";
+      const wrap = document.createElement("div");
+      wrap.className = "page-canvas-wrap";
+      wrap.style.width = viewport.width + "px";
+      wrap.style.height = viewport.height + "px";
+      wrap.appendChild(pdfCanvas);
 
-wrap.appendChild(pdfCanvas);
+      let drawCanvas = null;
 
-let drawCanvas = null;
+      if (isSignMode()) {
+        drawCanvas = document.createElement("canvas");
+        drawCanvas.className = "draw-canvas";
+        drawCanvas.width = viewport.width;
+        drawCanvas.height = viewport.height;
+        drawCanvas.style.width = viewport.width + "px";
+        drawCanvas.style.height = viewport.height + "px";
+        wrap.appendChild(drawCanvas);
+      }
 
-if (currentMode === "mode1" || currentMode === "mode3") {
-  drawCanvas = document.createElement("canvas");
-  drawCanvas.className = "draw-canvas";
-  drawCanvas.width = viewport.width;
-  drawCanvas.height = viewport.height;
-  drawCanvas.style.width = viewport.width + "px";
-  drawCanvas.style.height = viewport.height + "px";
+      pageFrame.innerHTML = "";
+      pageFrame.appendChild(wrap);
 
-  wrap.appendChild(drawCanvas);
-}
-
-pageFrame.innerHTML = "";
-pageFrame.appendChild(wrap);
-
-if (drawCanvas) {
-  const tools = setupDrawing(drawCanvas, overlayCanvas);
-  drawCanvas._clearOverlay = tools.clear;
+      if (drawCanvas) {
+        const tools = setupDrawing(drawCanvas, overlayCanvas);
+        drawCanvas._clearOverlay = tools.clear;
+      }
 
       updatePageIndicator();
     }
@@ -811,13 +808,12 @@ if (drawCanvas) {
     }
 
     function clearCurrentPage() {
-  if (currentMode !== "mode1" && currentMode !== "mode3") return;
-
-  const drawCanvas = pageFrame.querySelector(".draw-canvas");
-  if (drawCanvas && typeof drawCanvas._clearOverlay === "function") {
-    drawCanvas._clearOverlay();
-  }
-}
+      if (!isSignMode()) return;
+      const drawCanvas = pageFrame.querySelector(".draw-canvas");
+      if (drawCanvas && typeof drawCanvas._clearOverlay === "function") {
+        drawCanvas._clearOverlay();
+      }
+    }
 
     function buildOverlaysPayload() {
       const result = [];
@@ -832,7 +828,10 @@ if (drawCanvas) {
 
         const ctx = merged.getContext("2d");
         ctx.drawImage(state.pdfCanvas, 0, 0);
-        ctx.drawImage(state.overlayCanvas, 0, 0);
+
+        if (isSignMode()) {
+          ctx.drawImage(state.overlayCanvas, 0, 0);
+        }
 
         result.push({
           pageIndex: i,
@@ -847,17 +846,12 @@ if (drawCanvas) {
       try {
         clearMsg();
 
-        if (currentMode === "mode2") {
+        if (!isSignMode()) {
           setMsg("Dieses Dokument ist nur zum Anzeigen gedacht.", "err");
           return;
         }
 
         const overlays = buildOverlaysPayload();
-
-        if (!overlays.length) {
-          setMsg("Keine Signatur erhalten.", "err");
-          return;
-        }
 
         const res = await fetch(`/api/sign?screen=${screen}`, {
           method: "POST",
@@ -916,15 +910,23 @@ if (drawCanvas) {
           return;
         }
 
-        if (currentPdfUrl !== data.file || currentVersion !== data.version) {
+        const docChanged = currentPdfUrl !== data.file || currentVersion !== data.version;
+        const modeChanged = currentMode !== data.mode;
+
+        if (docChanged) {
           currentPdfUrl = data.file;
           currentVersion = data.version;
-
           showLive();
           applyMode(data.mode, data.session || null);
           await loadPdf(`${data.file}?v=${data.version}`);
-        } else if (currentMode !== data.mode) {
+          return;
+        }
+
+        if (modeChanged) {
           applyMode(data.mode, data.session || null);
+          if (pdfDoc) {
+            await renderCurrentPage();
+          }
         }
       } catch (error) {
         console.error(error);
