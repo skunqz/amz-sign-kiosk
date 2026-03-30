@@ -33,7 +33,7 @@
       inset: 0;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.45s ease;
+      transition: opacity 0.35s ease;
     }
 
     .screen.visible {
@@ -68,7 +68,6 @@
       justify-content: space-between;
       padding: 24px 28px;
       background: rgba(0, 0, 0, 0.92);
-      backdrop-filter: blur(10px);
       border-bottom: 1px solid rgba(255,255,255,0.08);
     }
 
@@ -124,12 +123,6 @@
       background: white;
       max-width: 100%;
       max-height: 100%;
-      opacity: 1;
-      transition: opacity 0.3s ease;
-    }
-
-    .page-wrap.loading {
-      opacity: 0.15;
     }
 
     #pdfCanvas {
@@ -142,8 +135,9 @@
       left: 0;
       top: 0;
       display: block;
-      touch-action: none;
       background: transparent;
+      touch-action: none;
+      will-change: transform;
     }
 
     .nav-arrow {
@@ -159,19 +153,11 @@
       font-size: 34px;
       cursor: pointer;
       z-index: 3;
-      backdrop-filter: blur(8px);
-      transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
-    }
-
-    .nav-arrow:hover {
-      background: rgba(255,255,255,0.18);
-      transform: translateY(-50%) scale(1.03);
     }
 
     .nav-arrow:disabled {
       opacity: 0.28;
       cursor: default;
-      transform: translateY(-50%);
     }
 
     .nav-left {
@@ -202,11 +188,11 @@
       border-radius: 18px;
       height: 70px;
       cursor: pointer;
-      transition: 0.15s ease;
+      transition: transform 0.12s ease;
     }
 
     button.action-btn:hover {
-      transform: translateY(-2px);
+      transform: translateY(-1px);
     }
 
     #clearBtn {
@@ -228,10 +214,9 @@
       align-items: center;
       justify-content: center;
       background: rgba(0, 0, 0, 0.76);
-      backdrop-filter: blur(8px);
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.35s ease;
+      transition: opacity 0.25s ease;
     }
 
     .success-overlay.visible {
@@ -248,8 +233,8 @@
       padding: 38px 36px;
       text-align: center;
       box-shadow: 0 25px 70px rgba(0,0,0,0.45);
-      transform: scale(0.92);
-      transition: transform 0.35s ease;
+      transform: scale(0.96);
+      transition: transform 0.25s ease;
     }
 
     .success-overlay.visible .success-card {
@@ -280,7 +265,7 @@
     }
 
     .success-overlay.visible .checkmark {
-      animation: drawCheck 0.55s ease forwards 0.15s;
+      animation: drawCheck 0.45s ease forwards 0.1s;
     }
 
     .success-title {
@@ -314,8 +299,8 @@
         <div class="brand">
           <img src="/logo.png" alt="Logo">
           <div class="brand-text">
-            <h1 id="headline">Bitte bestätigen</h1>
-            <p id="subline">Bitte prüfen Sie das Dokument</p>
+            <h1 id="headline">Bitte unterschreiben Sie das Dokument</h1>
+            <p id="subline">Nutzen Sie die Pfeile, um zwischen den Seiten zu wechseln</p>
           </div>
         </div>
         <div class="page-indicator" id="pageIndicator">Seite 1 / 1</div>
@@ -366,16 +351,12 @@
     const pdfCanvas = document.getElementById("pdfCanvas");
     const overlayCanvas = document.getElementById("signatureOverlay");
     const pageIndicator = document.getElementById("pageIndicator");
-    const headline = document.getElementById("headline");
-    const subline = document.getElementById("subline");
-    const buttonBar = document.getElementById("buttonBar");
     const clearBtn = document.getElementById("clearBtn");
     const sendBtn = document.getElementById("sendBtn");
     const closeBtn = document.getElementById("closeBtn");
     const prevPageBtn = document.getElementById("prevPageBtn");
     const nextPageBtn = document.getElementById("nextPageBtn");
     const pdfStage = document.getElementById("pdfStage");
-    const pageWrap = document.getElementById("pageWrap");
 
     let currentVersion = null;
     let isSending = false;
@@ -385,6 +366,10 @@
     let currentPageIndex = 0;
     let overlaysByPage = [];
     let isDrawing = false;
+    let activePointerId = null;
+
+    const pdfCtx = pdfCanvas.getContext("2d", { alpha: false, desynchronized: true });
+    const overlayCtx = overlayCanvas.getContext("2d", { alpha: true, desynchronized: true });
 
     function showStandby() {
       standby.classList.add("visible");
@@ -395,6 +380,8 @@
       pdfDocRef = null;
       overlaysByPage = [];
       currentPageIndex = 0;
+      isDrawing = false;
+      activePointerId = null;
     }
 
     function showActive() {
@@ -426,19 +413,17 @@
 
     function updateModeUi() {
       if (currentMode === "mode2") {
-        headline.textContent = "Dokument ansehen";
-        subline.textContent = "Nutzen Sie die Pfeile, um zwischen den Seiten zu wechseln";
         clearBtn.style.display = "none";
         sendBtn.style.display = "none";
         closeBtn.style.display = "block";
-        buttonBar.classList.add("single");
+        document.getElementById("buttonBar").classList.add("single");
+        overlayCanvas.style.pointerEvents = "none";
       } else {
-        headline.textContent = "Bitte unterschreiben Sie das Dokument";
-        subline.textContent = "Nutzen Sie die Pfeile, um zwischen den Seiten zu wechseln";
         clearBtn.style.display = "block";
         sendBtn.style.display = "block";
         closeBtn.style.display = "none";
-        buttonBar.classList.remove("single");
+        document.getElementById("buttonBar").classList.remove("single");
+        overlayCanvas.style.pointerEvents = "auto";
       }
     }
 
@@ -451,10 +436,9 @@
 
     function getPos(e) {
       const rect = overlayCanvas.getBoundingClientRect();
-      const t = e.touches ? e.touches[0] : e;
       return {
-        x: t.clientX - rect.left,
-        y: t.clientY - rect.top
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
       };
     }
 
@@ -464,29 +448,28 @@
       overlayCanvas.style.width = width + "px";
       overlayCanvas.style.height = height + "px";
 
-      const ctx = overlayCanvas.getContext("2d");
-      ctx.clearRect(0, 0, width, height);
-      ctx.lineWidth = 2.8;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.strokeStyle = "#111111";
+      overlayCtx.clearRect(0, 0, width, height);
+      overlayCtx.lineWidth = 2.4;
+      overlayCtx.lineCap = "round";
+      overlayCtx.lineJoin = "round";
+      overlayCtx.strokeStyle = "#111111";
 
       const item = getOverlayItem(currentPageIndex);
       if (item.image) {
         const img = new Image();
         img.onload = () => {
-          ctx.drawImage(img, 0, 0, width, height);
+          overlayCtx.drawImage(img, 0, 0, width, height);
         };
         img.src = item.image;
       }
-
-      overlayCanvas.style.pointerEvents = currentMode === "mode2" ? "none" : "auto";
     }
 
     function saveCurrentOverlay() {
       if (!pdfDocRef || currentMode === "mode2") return;
+
       const item = getOverlayItem(currentPageIndex);
       item.image = overlayCanvas.toDataURL("image/png");
+
       const blank = document.createElement("canvas");
       blank.width = overlayCanvas.width;
       blank.height = overlayCanvas.height;
@@ -494,19 +477,14 @@
     }
 
     function clearCurrentPageSignature() {
-      const ctx = overlayCanvas.getContext("2d");
-      ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+      overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
       const item = getOverlayItem(currentPageIndex);
       item.image = null;
       item.hasSignature = false;
     }
 
-    async function renderCurrentPage(withFade = false) {
+    async function renderCurrentPage() {
       if (!pdfDocRef) return;
-
-      if (withFade) {
-        pageWrap.classList.add("loading");
-      }
 
       const page = await pdfDocRef.getPage(currentPageIndex + 1);
       const viewport = page.getViewport({ scale: 1 });
@@ -520,7 +498,6 @@
       );
 
       const vp = page.getViewport({ scale });
-      const ctx = pdfCanvas.getContext("2d");
 
       pdfCanvas.width = vp.width;
       pdfCanvas.height = vp.height;
@@ -528,37 +505,27 @@
       pdfCanvas.style.height = vp.height + "px";
 
       await page.render({
-        canvasContext: ctx,
+        canvasContext: pdfCtx,
         viewport: vp
       }).promise;
 
       setupOverlayCanvas(vp.width, vp.height);
       updatePageIndicator();
-
-      if (withFade) {
-        setTimeout(() => {
-          pageWrap.classList.remove("loading");
-        }, 60);
-      }
     }
 
     async function loadPdfDocument(url) {
-      pageWrap.classList.add("loading");
       pdfDocRef = await pdfjsLib.getDocument(url).promise;
       overlaysByPage = Array.from({ length: pdfDocRef.numPages }, () => ({
         image: null,
         hasSignature: false
       }));
       currentPageIndex = 0;
-
-      setTimeout(async () => {
-        await renderCurrentPage(true);
-      }, 180);
+      await renderCurrentPage();
     }
 
     async function loadPdf(force = false) {
       try {
-        const res = await fetch("/api/document?_=" + Date.now(), { cache: "no-store" });
+        const res = await fetch(`/api/document?_=${Date.now()}`, { cache: "no-store" });
         const data = await res.json();
 
         if (!force && currentVersion === data.version) return;
@@ -572,66 +539,73 @@
         currentMode = data.mode;
         updateModeUi();
         showActive();
-
-        setTimeout(async () => {
-          await loadPdfDocument(data.file + "?v=" + data.version);
-        }, 220);
+        await loadPdfDocument(data.file + "?v=" + data.version);
       } catch (err) {
         console.error("Fehler beim Laden der PDF:", err);
         showStandby();
       }
     }
 
-    function startDraw(e) {
+    function pointerDown(e) {
       if (isSending || currentMode === "mode2") return;
-      e.preventDefault();
+      if (activePointerId !== null) return;
+
+      activePointerId = e.pointerId;
       isDrawing = true;
+
+      overlayCanvas.setPointerCapture(e.pointerId);
+
       const pos = getPos(e);
-      const ctx = overlayCanvas.getContext("2d");
-      ctx.beginPath();
-      ctx.moveTo(pos.x, pos.y);
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(pos.x, pos.y);
+      e.preventDefault();
     }
 
-    function draw(e) {
-      if (!isDrawing || isSending || currentMode === "mode2") return;
-      e.preventDefault();
+    function pointerMove(e) {
+      if (!isDrawing || currentMode === "mode2") return;
+      if (e.pointerId !== activePointerId) return;
+
       const pos = getPos(e);
-      const ctx = overlayCanvas.getContext("2d");
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
+      overlayCtx.lineTo(pos.x, pos.y);
+      overlayCtx.stroke();
 
       const item = getOverlayItem(currentPageIndex);
       item.hasSignature = true;
+
+      e.preventDefault();
     }
 
-    function endDraw(e) {
-      if (e) e.preventDefault();
-      if (!isDrawing) return;
+    function pointerUp(e) {
+      if (e.pointerId !== activePointerId) return;
+
       isDrawing = false;
+      activePointerId = null;
       saveCurrentOverlay();
+
+      try {
+        overlayCanvas.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+
+      e.preventDefault();
     }
 
-    overlayCanvas.addEventListener("mousedown", startDraw);
-    overlayCanvas.addEventListener("mousemove", draw);
-    overlayCanvas.addEventListener("mouseup", endDraw);
-    overlayCanvas.addEventListener("mouseleave", endDraw);
-
-    overlayCanvas.addEventListener("touchstart", startDraw, { passive: false });
-    overlayCanvas.addEventListener("touchmove", draw, { passive: false });
-    overlayCanvas.addEventListener("touchend", endDraw, { passive: false });
+    overlayCanvas.addEventListener("pointerdown", pointerDown, { passive: false });
+    overlayCanvas.addEventListener("pointermove", pointerMove, { passive: false });
+    overlayCanvas.addEventListener("pointerup", pointerUp, { passive: false });
+    overlayCanvas.addEventListener("pointercancel", pointerUp, { passive: false });
 
     prevPageBtn.addEventListener("click", async () => {
       if (!pdfDocRef || currentPageIndex <= 0) return;
       saveCurrentOverlay();
       currentPageIndex -= 1;
-      await renderCurrentPage(false);
+      await renderCurrentPage();
     });
 
     nextPageBtn.addEventListener("click", async () => {
       if (!pdfDocRef || currentPageIndex >= pdfDocRef.numPages - 1) return;
       saveCurrentOverlay();
       currentPageIndex += 1;
-      await renderCurrentPage(false);
+      await renderCurrentPage();
     });
 
     clearBtn.addEventListener("click", () => {
@@ -656,7 +630,7 @@
           .map((item, pageIndex) => ({ ...item, pageIndex }))
           .filter(item => item.hasSignature && item.image);
 
-        const res = await fetch("/api/sign", {
+        const res = await fetch(`/api/sign`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ overlays })
@@ -670,12 +644,12 @@
           setTimeout(() => {
             hideSuccess();
             showStandby();
-          }, 1800);
+          }, 1600);
 
           setTimeout(() => {
             loadPdf(true);
             isSending = false;
-          }, 2400);
+          }, 2100);
         } else {
           isSending = false;
           alert(data.error || "Fehler");
@@ -691,7 +665,7 @@
       isSending = true;
 
       try {
-        const res = await fetch("/api/close", {
+        const res = await fetch(`/api/close`, {
           method: "POST"
         });
 
@@ -703,12 +677,12 @@
           setTimeout(() => {
             hideSuccess();
             showStandby();
-          }, 1400);
+          }, 1200);
 
           setTimeout(() => {
             loadPdf(true);
             isSending = false;
-          }, 1900);
+          }, 1700);
         } else {
           isSending = false;
           alert(data.error || "Fehler");
