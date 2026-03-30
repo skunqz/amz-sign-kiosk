@@ -395,7 +395,6 @@
           <div style="height:16px;"></div>
 
           <div class="buttons">
-            <button id="saveBtn" class="primary">Daten speichern</button>
             <button id="uploadBtn" class="primary">PDF hochladen</button>
             <button id="closeBtn" class="danger">PDF schließen / Standby aktivieren</button>
           </div>
@@ -425,7 +424,6 @@
     const notificationInfo = document.getElementById("notificationInfo");
     const fileInput = document.getElementById("pdfFile");
     const fileInfo = document.getElementById("fileInfo");
-    const saveBtn = document.getElementById("saveBtn");
     const uploadBtn = document.getElementById("uploadBtn");
     const closeBtn = document.getElementById("closeBtn");
 
@@ -457,10 +455,7 @@
         : "Keine Datei ausgewählt.";
     });
 
-    async function saveSession() {
-      saveBtn.disabled = true;
-      setMessage("Speichere...");
-
+    async function saveSessionIfNeeded() {
       let payload = { mode: mode.value };
 
       if (mode.value === "mode1") {
@@ -474,26 +469,13 @@
         payload.reason = document.getElementById("reason3").value.trim();
       }
 
-      try {
-        const res = await fetch("/api/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-        const data = await res.json();
-
-        if (data.success) {
-          setMessage("Daten gespeichert.");
-          await loadStatus();
-        } else {
-          setMessage(data.error || "Fehler beim Speichern.", true);
-        }
-      } catch (err) {
-        setMessage("Fehler beim Speichern: " + err.message, true);
-      } finally {
-        saveBtn.disabled = false;
-      }
+      return res.json();
     }
 
     async function uploadPdf() {
@@ -504,12 +486,22 @@
       }
 
       uploadBtn.disabled = true;
-      setMessage("PDF wird hochgeladen...");
-
-      const formData = new FormData();
-      formData.append("pdf", file);
+      setMessage("Daten werden vorbereitet...");
 
       try {
+        const sessionData = await saveSessionIfNeeded();
+
+        if (!sessionData.success) {
+          setMessage(sessionData.error || "Fehler beim Speichern der Daten.", true);
+          uploadBtn.disabled = false;
+          return;
+        }
+
+        setMessage("PDF wird hochgeladen...");
+
+        const formData = new FormData();
+        formData.append("pdf", file);
+
         const res = await fetch("/api/upload", {
           method: "POST",
           body: formData
@@ -630,7 +622,6 @@
       }
     }
 
-    document.getElementById("saveBtn").addEventListener("click", saveSession);
     document.getElementById("uploadBtn").addEventListener("click", uploadPdf);
     document.getElementById("closeBtn").addEventListener("click", closePdf);
     document.getElementById("logoutBtn").addEventListener("click", logout);
