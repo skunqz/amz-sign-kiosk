@@ -6,94 +6,93 @@
   <title>Screen auswählen</title>
   <style>
     :root{
-      --bg:#0f172a;
-      --panel:#111827;
-      --line:#334155;
-      --text:#e5e7eb;
-      --muted:#94a3b8;
+      --bg:#000000;
+      --panel:#0b0b0b;
+      --line:#1f1f1f;
+      --text:#ffffff;
+      --muted:#b3b3b3;
       --accent:#2563eb;
+      --accent2:#1d4ed8;
     }
+
     *{box-sizing:border-box}
-    body{
+
+    html,body{
       margin:0;
       min-height:100vh;
       font-family:Arial, Helvetica, sans-serif;
-      background:linear-gradient(180deg,#0b1220 0%, #0f172a 100%);
+      background:var(--bg);
       color:var(--text);
-      display:grid;
-      place-items:center;
+    }
+
+    body{
+      display:flex;
+      align-items:center;
+      justify-content:center;
       padding:24px;
     }
+
     .card{
-      width:min(720px,100%);
-      background:rgba(17,24,39,.96);
+      width:min(700px,100%);
+      background:var(--panel);
       border:1px solid var(--line);
-      border-radius:22px;
-      padding:28px;
-      box-shadow:0 20px 40px rgba(0,0,0,.28);
+      border-radius:24px;
+      padding:32px;
+      box-shadow:0 20px 50px rgba(0,0,0,.45);
+      text-align:center;
     }
-    h1{margin:0 0 8px;font-size:32px}
-    p{margin:0 0 24px;color:var(--muted)}
+
+    h1{
+      margin:0 0 10px;
+      font-size:34px;
+    }
+
+    p{
+      margin:0 0 28px;
+      color:var(--muted);
+      font-size:18px;
+    }
+
     .grid{
       display:grid;
       grid-template-columns:1fr 1fr;
-      gap:16px;
+      gap:18px;
     }
-    .screen-card{
-      background:#0b1220;
-      border:1px solid var(--line);
-      border-radius:18px;
-      padding:18px;
-    }
-    .screen-card h2{
-      margin:0 0 12px;
-      font-size:24px;
-    }
-    .btns{
-      display:grid;
-      gap:10px;
-    }
-    a{
-      display:block;
+
+    .screen-btn{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:170px;
+      border-radius:20px;
       text-decoration:none;
-      text-align:center;
-      padding:12px 14px;
-      border-radius:12px;
-      border:1px solid var(--line);
       color:white;
-      background:#1e293b;
-      font-weight:700;
-    }
-    a.primary{
+      font-size:28px;
+      font-weight:800;
       background:var(--accent);
-      border-color:var(--accent);
+      border:1px solid var(--accent);
+      transition:.15s ease;
     }
+
+    .screen-btn:hover{
+      background:var(--accent2);
+    }
+
     @media (max-width:700px){
-      .grid{grid-template-columns:1fr}
+      .grid{
+        grid-template-columns:1fr;
+      }
     }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>Screen auswählen</h1>
-    <p>Wähle, ob du den Kiosk oder das Admin Panel für Screen 1 oder Screen 2 öffnen möchtest.</p>
+    <p>Bitte wählen Sie den gewünschten Bildschirm aus.</p>
 
     <div class="grid">
-      <div class="screen-card">
-        <h2>Screen 1</h2>
-        <div class="btns">
-          <a class="primary" href="/kiosk.html?screen=1">Kiosk öffnen</a>
-          <a href="/admin?screen=1">Admin öffnen</a>
-        </div>
-      </div>
-
-      <div class="screen-card">
-        <h2>Screen 2</h2>
-        <div class="btns">
-          <a class="primary" href="/kiosk.html?screen=2">Kiosk öffnen</a>
-          <a href="/admin?screen=2">Admin öffnen</a>
-        </div>
-      </div>
+      <a class="screen-btn" href="/kiosk.html?screen=1">Screen 1</a>
+      <a class="screen-btn" href="/kiosk.html?screen=2">Screen 2</a>
     </div>
   </div>
 </body>
