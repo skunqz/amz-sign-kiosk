@@ -393,6 +393,90 @@
       text-align:center;
     }
 
+    .popup-overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.72);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:9999;
+      opacity:0;
+      visibility:hidden;
+      transition:opacity .35s ease, visibility .35s ease;
+    }
+
+    .popup-overlay.show{
+      opacity:1;
+      visibility:visible;
+    }
+
+    .popup-box{
+      width:min(520px, 88vw);
+      background:rgba(17,24,39,.98);
+      border:1px solid #334155;
+      border-radius:24px;
+      padding:28px 24px;
+      text-align:center;
+      box-shadow:0 20px 60px rgba(0,0,0,.45);
+      transform:translateY(14px) scale(.96);
+      transition:transform .35s ease;
+    }
+
+    .popup-overlay.show .popup-box{
+      transform:translateY(0) scale(1);
+    }
+
+    .popup-spinner{
+      width:64px;
+      height:64px;
+      margin:0 auto 18px;
+      border-radius:50%;
+      border:6px solid rgba(255,255,255,.14);
+      border-top-color:#3b82f6;
+      animation:spin 1s linear infinite;
+    }
+
+    .popup-check{
+      width:72px;
+      height:72px;
+      margin:0 auto 18px;
+      border-radius:50%;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(22,163,74,.16);
+      border:2px solid rgba(22,163,74,.45);
+      color:#22c55e;
+      font-size:38px;
+      font-weight:800;
+    }
+
+    .popup-overlay.success .popup-spinner{
+      display:none;
+    }
+
+    .popup-overlay.success .popup-check{
+      display:flex;
+    }
+
+    .popup-title{
+      font-size:30px;
+      font-weight:800;
+      margin-bottom:10px;
+    }
+
+    .popup-text{
+      color:#cbd5e1;
+      font-size:18px;
+      line-height:1.5;
+    }
+
+    @keyframes spin{
+      from{ transform:rotate(0deg); }
+      to{ transform:rotate(360deg); }
+    }
+
     @media (max-width: 900px){
       .title{
         font-size:21px;
@@ -464,12 +548,20 @@
             <label for="phone">Telefonnummer</label>
             <input id="phone" type="text" readonly />
           </div>
+          <div class="field">
+            <label for="plate">KFZ-Kennzeichen</label>
+            <input id="plate" type="text" readonly />
+          </div>
         </div>
 
         <div id="mode3Fields" class="fields hidden">
           <div class="field">
             <label for="name3">Name</label>
             <input id="name3" type="text" readonly />
+          </div>
+          <div class="field">
+            <label for="plate3">KFZ-Kennzeichen</label>
+            <input id="plate3" type="text" readonly />
           </div>
           <div class="field">
             <label for="reason">Grund</label>
@@ -492,6 +584,15 @@
 
         <div id="msg" class="msg"></div>
       </div>
+    </div>
+  </div>
+
+  <div id="sendPopup" class="popup-overlay">
+    <div class="popup-box">
+      <div class="popup-spinner"></div>
+      <div class="popup-check">✓</div>
+      <div class="popup-title" id="popupTitle">Auftrag wird verschickt</div>
+      <div class="popup-text" id="popupText">Bitte einen kurzen Moment warten …</div>
     </div>
   </div>
 
@@ -526,11 +627,17 @@
     const viewActions = document.getElementById("viewActions");
 
     const msg = document.getElementById("msg");
+    const sendPopup = document.getElementById("sendPopup");
+    const popupTitle = document.getElementById("popupTitle");
+    const popupText = document.getElementById("popupText");
 
     const nameInput = document.getElementById("name");
     const emailInput = document.getElementById("email");
     const phoneInput = document.getElementById("phone");
+    const plateInput = document.getElementById("plate");
+
     const name3Input = document.getElementById("name3");
+    const plate3Input = document.getElementById("plate3");
     const reasonInput = document.getElementById("reason");
 
     let currentPdfUrl = null;
@@ -568,6 +675,25 @@
       msg.textContent = "";
     }
 
+    function showSendingPopup(title = "Auftrag wird verschickt", text = "Bitte einen kurzen Moment warten …") {
+      popupTitle.textContent = title;
+      popupText.textContent = text;
+      sendPopup.classList.remove("success");
+      sendPopup.classList.add("show");
+    }
+
+    function showSuccessPopup(title = "Erfolgreich verschickt", text = "Der Auftrag wurde erfolgreich übermittelt.") {
+      popupTitle.textContent = title;
+      popupText.textContent = text;
+      sendPopup.classList.add("show");
+      sendPopup.classList.add("success");
+    }
+
+    function hidePopup() {
+      sendPopup.classList.remove("show");
+      sendPopup.classList.remove("success");
+    }
+
     function isSignMode() {
       return currentMode === "mode1" || currentMode === "mode3";
     }
@@ -586,6 +712,7 @@
       pageStates = [];
       pageFrame.innerHTML = '<div class="loading">Dokument wird geladen …</div>';
       clearMsg();
+      hidePopup();
     }
 
     function showLive() {
@@ -608,14 +735,18 @@
         mode1Fields.classList.remove("hidden");
         signActions.classList.remove("hidden");
         modeHint.textContent = "Bitte prüfen Sie das Dokument und unterschreiben Sie auf den Seiten.";
+
         nameInput.value = session?.name || "";
         emailInput.value = session?.email || "";
         phoneInput.value = session?.phone || "";
+        plateInput.value = session?.plate || "";
       } else if (mode === "mode3") {
         mode3Fields.classList.remove("hidden");
         signActions.classList.remove("hidden");
         modeHint.textContent = "Bitte prüfen Sie das Dokument und unterschreiben Sie auf den Seiten.";
+
         name3Input.value = session?.name || "";
+        plate3Input.value = session?.plate || "";
         reasonInput.value = session?.reason || "";
       } else {
         mode2Info.classList.remove("hidden");
@@ -853,6 +984,8 @@
 
         const overlays = buildOverlaysPayload();
 
+        showSendingPopup("Auftrag wird verschickt", "Bitte einen kurzen Moment warten …");
+
         const res = await fetch(`/api/sign?screen=${screen}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -862,15 +995,19 @@
         const data = await res.json();
 
         if (!res.ok || !data.success) {
+          hidePopup();
           throw new Error(data.error || "Dokument konnte nicht bestätigt werden.");
         }
 
+        showSuccessPopup("Erfolgreich verschickt", "Der Auftrag wurde erfolgreich per E-Mail versendet.");
         setMsg("Dokument wurde erfolgreich bestätigt.", "ok");
 
         setTimeout(() => {
+          hidePopup();
           showStandby();
-        }, 1200);
+        }, 1800);
       } catch (error) {
+        hidePopup();
         setMsg(error.message || "Fehler beim Bestätigen.", "err");
       }
     }
