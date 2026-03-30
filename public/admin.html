@@ -1,170 +1,443 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Panel</title>
 
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #0f172a;
-      color: white;
-      padding: 30px;
+    * {
+      box-sizing: border-box;
     }
 
-    h1 {
-      margin-bottom: 20px;
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
+      color: #f8fafc;
+      padding: 26px;
     }
 
     .container {
-      max-width: 700px;
-      margin: auto;
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      padding: 8px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 32px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      margin-top: 4px;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 22px;
     }
 
     .card {
-      background: #1e293b;
-      padding: 20px;
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px;
+      padding: 22px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.28);
+      backdrop-filter: blur(10px);
+    }
+
+    .card h3 {
+      margin: 0 0 16px;
+      font-size: 18px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .status-box {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .status-live {
+      background: rgba(34,197,94,0.18);
+      color: #86efac;
+    }
+
+    .status-standby {
+      background: rgba(239,68,68,0.16);
+      color: #fca5a5;
+    }
+
+    .status-line {
+      color: #cbd5e1;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .status-line strong {
+      color: #f8fafc;
+    }
+
+    .preview-wrap {
+      height: 720px;
+      overflow: hidden;
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: #000;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #000;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .field label {
+      font-size: 14px;
+      font-weight: 700;
+      color: #cbd5e1;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.04);
+      color: #f8fafc;
+      border-radius: 16px;
+      padding: 14px 14px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: rgba(255,255,255,0.28);
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.08);
+    }
+
+    .upload-box {
+      border: 2px dashed rgba(255,255,255,0.12);
       border-radius: 20px;
-      margin-bottom: 20px;
+      padding: 18px;
+      text-align: center;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .upload-box input {
+      margin-top: 10px;
+    }
+
+    .buttons {
+      display: grid;
+      gap: 12px;
     }
 
     button {
-      padding: 12px;
       border: none;
-      border-radius: 10px;
+      border-radius: 16px;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    .primary {
       background: #22c55e;
       color: white;
-      cursor: pointer;
-      font-weight: bold;
+      box-shadow: 0 14px 30px rgba(34,197,94,0.22);
     }
 
     .secondary {
-      background: #374151;
+      background: rgba(255,255,255,0.08);
+      color: #f8fafc;
     }
 
-    input, select {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      border-radius: 10px;
-      border: none;
+    .danger {
+      background: #dc2626;
+      color: white;
+      box-shadow: 0 14px 30px rgba(220,38,38,0.20);
     }
 
-    .row {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
+    #msg {
+      min-height: 24px;
+      color: #cbd5e1;
+      font-size: 14px;
+      font-weight: 600;
     }
 
-    .row button {
-      flex: 1;
+    .mode-panel {
+      display: none;
     }
 
-    #status {
-      margin-top: 10px;
+    .mode-panel.visible {
+      display: grid;
+      gap: 14px;
+    }
+
+    .notification-permission {
+      font-size: 13px;
       color: #94a3b8;
+    }
+
+    @media (max-width: 980px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .preview-wrap {
+        height: 480px;
+      }
     }
   </style>
 </head>
-
 <body>
   <div class="container">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h1>Admin Panel</h1>
-      <button onclick="logout()" class="secondary">Logout</button>
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="logo">
+          <img src="/logo.png" alt="Logo">
+        </div>
+        <div>
+          <h1>Admin Panel</h1>
+          <div class="subtitle">Upload, Live-Status, Vorschau und Benachrichtigungen</div>
+        </div>
+      </div>
+
+      <button id="logoutBtn" class="secondary">Abmelden</button>
     </div>
 
-    <div class="card">
-      <h3>Modus auswählen</h3>
+    <div class="grid">
+      <div class="stack">
+        <div class="card">
+          <h3>Live Status</h3>
 
-      <select id="mode">
-        <option value="mode1">Mit Kundendaten + Unterschrift</option>
-        <option value="mode2">Nur anzeigen (keine Unterschrift)</option>
-        <option value="mode3">Name + Grund + Unterschrift</option>
-      </select>
-    </div>
+          <div class="status-box">
+            <div id="statusBadge" class="status-badge status-standby">Standby</div>
+            <div id="statusLines" class="status-line">Wird geladen...</div>
+          </div>
 
-    <div class="card" id="formCard">
-      <h3>Kundendaten</h3>
+          <div style="height:12px;"></div>
 
-      <input id="name" placeholder="Name">
-      <input id="email" placeholder="E-Mail">
-      <input id="phone" placeholder="Telefon">
-      <input id="reason" placeholder="Grund">
+          <div class="notification-permission" id="notificationInfo">
+            Browser-Benachrichtigungen werden vorbereitet...
+          </div>
+        </div>
 
-      <button onclick="saveSession()">Speichern</button>
-    </div>
+        <div class="card">
+          <h3>Modus auswählen</h3>
 
-    <div class="card">
-      <h3>PDF hochladen</h3>
+          <div class="field">
+            <label for="mode">Modus</label>
+            <select id="mode">
+              <option value="mode1">Mit Kundendaten + Unterschrift</option>
+              <option value="mode2">Nur anzeigen (keine Unterschrift)</option>
+              <option value="mode3">Name + Grund + Unterschrift</option>
+            </select>
+          </div>
+        </div>
 
-      <input type="file" id="pdfFile">
+        <div class="card">
+          <h3>Daten & Upload</h3>
 
-      <button onclick="upload()">Upload</button>
+          <div id="mode1Panel" class="mode-panel visible">
+            <div class="field">
+              <label for="name1">Name</label>
+              <input id="name1" type="text" placeholder="Name">
+            </div>
 
-      <div id="status"></div>
+            <div class="field">
+              <label for="email1">E-Mail</label>
+              <input id="email1" type="email" placeholder="E-Mail">
+            </div>
+
+            <div class="field">
+              <label for="phone1">Telefon</label>
+              <input id="phone1" type="text" placeholder="Telefon">
+            </div>
+          </div>
+
+          <div id="mode2Panel" class="mode-panel">
+            <div class="status-line">
+              In diesem Modus wird das Dokument nur angezeigt. Keine Unterschrift, keine Kundendaten.
+            </div>
+          </div>
+
+          <div id="mode3Panel" class="mode-panel">
+            <div class="field">
+              <label for="name3">Name</label>
+              <input id="name3" type="text" placeholder="Name">
+            </div>
+
+            <div class="field">
+              <label for="reason3">Grund</label>
+              <textarea id="reason3" placeholder="Grund"></textarea>
+            </div>
+          </div>
+
+          <div style="height:16px;"></div>
+
+          <div class="upload-box">
+            <div><strong>PDF auswählen</strong></div>
+            <input type="file" id="pdfFile" accept="application/pdf">
+          </div>
+
+          <div style="height:16px;"></div>
+
+          <div class="buttons">
+            <button id="saveBtn" class="primary">Daten speichern</button>
+            <button id="uploadBtn" class="primary">PDF hochladen</button>
+            <button id="closeBtn" class="danger">PDF schließen / Standby aktivieren</button>
+          </div>
+
+          <div style="height:12px;"></div>
+          <div id="msg"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Live Vorschau</h3>
+        <div class="preview-wrap">
+          <iframe id="previewFrame" src="/"></iframe>
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
-    const modeSelect = document.getElementById("mode");
-    const formCard = document.getElementById("formCard");
+    const mode = document.getElementById("mode");
+    const mode1Panel = document.getElementById("mode1Panel");
+    const mode2Panel = document.getElementById("mode2Panel");
+    const mode3Panel = document.getElementById("mode3Panel");
+    const msg = document.getElementById("msg");
+    const statusBadge = document.getElementById("statusBadge");
+    const statusLines = document.getElementById("statusLines");
+    const notificationInfo = document.getElementById("notificationInfo");
 
-    modeSelect.addEventListener("change", updateForm);
+    let lastNotifiedAt = localStorage.getItem("lastSignedAt") || null;
 
-    function updateForm() {
-      const mode = modeSelect.value;
+    function setModePanels() {
+      const value = mode.value;
+      mode1Panel.classList.remove("visible");
+      mode2Panel.classList.remove("visible");
+      mode3Panel.classList.remove("visible");
 
-      document.getElementById("email").style.display = "block";
-      document.getElementById("phone").style.display = "block";
-      document.getElementById("reason").style.display = "block";
-
-      if (mode === "mode2") {
-        formCard.style.display = "none";
-      } else {
-        formCard.style.display = "block";
-
-        if (mode === "mode1") {
-          document.getElementById("reason").style.display = "none";
-        }
-
-        if (mode === "mode3") {
-          document.getElementById("email").style.display = "none";
-          document.getElementById("phone").style.display = "none";
-        }
-      }
+      if (value === "mode1") mode1Panel.classList.add("visible");
+      if (value === "mode2") mode2Panel.classList.add("visible");
+      if (value === "mode3") mode3Panel.classList.add("visible");
     }
 
-    updateForm();
+    mode.addEventListener("change", setModePanels);
+    setModePanels();
+
+    function setMessage(text, isError = false) {
+      msg.textContent = text;
+      msg.style.color = isError ? "#fca5a5" : "#cbd5e1";
+    }
 
     async function saveSession() {
-      const data = {
-        mode: modeSelect.value,
-        name: document.getElementById("name").value,
-        email: document.getElementById("email").value,
-        phone: document.getElementById("phone").value,
-        reason: document.getElementById("reason").value
-      };
+      let payload = { mode: mode.value };
+
+      if (mode.value === "mode1") {
+        payload.name = document.getElementById("name1").value.trim();
+        payload.email = document.getElementById("email1").value.trim();
+        payload.phone = document.getElementById("phone1").value.trim();
+      }
+
+      if (mode.value === "mode3") {
+        payload.name = document.getElementById("name3").value.trim();
+        payload.reason = document.getElementById("reason3").value.trim();
+      }
 
       const res = await fetch("/api/session", {
         method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify(data)
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
 
-      const result = await res.json();
+      const data = await res.json();
 
-      if (result.success) {
-        alert("Gespeichert");
+      if (data.success) {
+        setMessage("Daten gespeichert.");
       } else {
-        alert(result.error);
+        setMessage(data.error || "Fehler beim Speichern.", true);
       }
     }
 
-    async function upload() {
+    async function uploadPdf() {
       const file = document.getElementById("pdfFile").files[0];
-      if (!file) return alert("Keine Datei");
+      if (!file) {
+        setMessage("Bitte zuerst eine PDF auswählen.", true);
+        return;
+      }
 
       const formData = new FormData();
       formData.append("pdf", file);
@@ -174,19 +447,111 @@
         body: formData
       });
 
-      const result = await res.json();
+      const data = await res.json();
 
-      if (result.success) {
-        document.getElementById("status").innerText = "Upload erfolgreich";
+      if (data.success) {
+        setMessage("PDF erfolgreich hochgeladen.");
+        document.getElementById("previewFrame").src = "/";
       } else {
-        document.getElementById("status").innerText = result.error;
+        setMessage(data.error || "Fehler beim Hochladen.", true);
+      }
+    }
+
+    async function closePdf() {
+      const res = await fetch("/api/close", {
+        method: "POST"
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setMessage("Standby wurde aktiviert.");
+        document.getElementById("previewFrame").src = "/";
+      } else {
+        setMessage(data.error || "Fehler beim Schließen.", true);
       }
     }
 
     async function logout() {
-      await fetch("/logout", { method: "POST" });
-      location.href = "/admin";
+      await fetch("/admin/logout", { method: "POST" });
+      window.location.href = "/admin";
     }
+
+    async function loadStatus() {
+      try {
+        const res = await fetch("/api/status");
+        const data = await res.json();
+
+        if (data.active) {
+          statusBadge.className = "status-badge status-live";
+          statusBadge.textContent = "Aktiv";
+        } else {
+          statusBadge.className = "status-badge status-standby";
+          statusBadge.textContent = "Standby";
+        }
+
+        statusLines.innerHTML = `
+          <div><strong>Status:</strong> ${data.active ? "Dokument geladen" : "Kein Dokument"}</div>
+          <div><strong>Modus:</strong> ${data.mode || "-"}</div>
+          <div><strong>Name:</strong> ${data.name || "-"}</div>
+          <div><strong>Datei:</strong> ${data.filename || "-"}</div>
+          <div><strong>Zuletzt unterschrieben:</strong> ${data.lastSignedAt ? new Date(data.lastSignedAt).toLocaleString("de-DE") : "-"}</div>
+          <div><strong>Letzte Person:</strong> ${data.lastSignedName || "-"}</div>
+        `;
+
+        if (data.lastSignedAt && data.lastSignedAt !== lastNotifiedAt) {
+          lastNotifiedAt = data.lastSignedAt;
+          localStorage.setItem("lastSignedAt", lastNotifiedAt);
+
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification("Neue Unterschrift eingegangen", {
+              body: `${data.lastSignedName || "Unbekannt"} • ${data.lastSignedFile || "Dokument"}`
+            });
+          }
+        }
+      } catch (err) {
+        statusLines.textContent = "Status konnte nicht geladen werden.";
+      }
+    }
+
+    async function setupNotifications() {
+      if (!("Notification" in window)) {
+        notificationInfo.textContent = "Dieser Browser unterstützt keine Benachrichtigungen.";
+        return;
+      }
+
+      if (Notification.permission === "granted") {
+        notificationInfo.textContent = "Browser-Benachrichtigungen sind aktiviert.";
+        return;
+      }
+
+      if (Notification.permission === "denied") {
+        notificationInfo.textContent = "Browser-Benachrichtigungen wurden blockiert.";
+        return;
+      }
+
+      notificationInfo.textContent = "Bitte Benachrichtigungen erlauben, damit neue Unterschriften gemeldet werden.";
+
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === "granted") {
+          notificationInfo.textContent = "Browser-Benachrichtigungen sind aktiviert.";
+        } else {
+          notificationInfo.textContent = "Browser-Benachrichtigungen wurden nicht erlaubt.";
+        }
+      } catch (err) {
+        notificationInfo.textContent = "Benachrichtigungen konnten nicht eingerichtet werden.";
+      }
+    }
+
+    document.getElementById("saveBtn").addEventListener("click", saveSession);
+    document.getElementById("uploadBtn").addEventListener("click", uploadPdf);
+    document.getElementById("closeBtn").addEventListener("click", closePdf);
+    document.getElementById("logoutBtn").addEventListener("click", logout);
+
+    setupNotifications();
+    loadStatus();
+    setInterval(loadStatus, 2000);
   </script>
 </body>
 </html>
