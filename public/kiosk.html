@@ -2,303 +2,576 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Kiosk</title>
-
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
   <style>
-    * {
-      box-sizing: border-box;
+    :root{
+      --bg:#0f172a;
+      --panel:#111827;
+      --line:#334155;
+      --text:#e5e7eb;
+      --muted:#94a3b8;
+      --accent:#2563eb;
+      --danger:#dc2626;
+      --success:#16a34a;
     }
-
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      font-family: Arial, sans-serif;
-      overflow: hidden;
-      background: #000;
-      color: white;
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial, Helvetica, sans-serif;
+      background:#0b1220;
+      color:var(--text);
     }
-
-    .app {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      background: #000;
+    .top{
+      position:sticky;
+      top:0;
+      z-index:20;
+      background:rgba(15,23,42,.96);
+      border-bottom:1px solid var(--line);
+      padding:14px 18px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
     }
-
-    .screen {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease;
+    .title{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
     }
-
-    .screen.visible {
-      opacity: 1;
-      pointer-events: auto;
+    .title strong{
+      font-size:20px;
     }
-
-    .standby {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #555;
-      z-index: 1;
+    .muted{color:var(--muted)}
+    .screen-pill{
+      background:#1e293b;
+      border:1px solid #475569;
+      padding:8px 12px;
+      border-radius:999px;
     }
-
-    .standby img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
+    .container{
+      padding:18px;
+      max-width:1200px;
+      margin:0 auto;
     }
-
-    .active {
-      display: grid;
-      grid-template-rows: 90px 1fr 90px;
-      background: #000;
-      z-index: 2;
+    .standby{
+      min-height:calc(100vh - 90px);
+      display:grid;
+      place-items:center;
+      text-align:center;
     }
-
-    .topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 18px 24px;
-      background: rgba(0, 0, 0, 0.92);
-      border-bottom: 1px solid rgba(255,255,255,0.08);
+    .standby-card{
+      width:min(700px,100%);
+      background:rgba(17,24,39,.96);
+      border:1px solid var(--line);
+      border-radius:24px;
+      padding:34px 22px;
+      box-shadow:0 20px 40px rgba(0,0,0,.25);
     }
-
-    .title {
-      font-size: 28px;
-      font-weight: 700;
+    .standby-card h1{
+      margin:0 0 10px;
+      font-size:40px;
     }
-
-    .subtitle {
-      font-size: 14px;
-      color: #cbd5e1;
-      margin-top: 4px;
+    .standby-card p{
+      margin:0;
+      color:var(--muted);
+      font-size:18px;
+      line-height:1.5;
     }
-
-    .screen-badge {
-      font-size: 16px;
-      font-weight: 700;
-      padding: 10px 14px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.08);
+    .live-grid{
+      display:grid;
+      grid-template-columns:340px 1fr;
+      gap:18px;
+      align-items:start;
     }
-
-    .pdf-wrap {
-      width: 100%;
-      height: 100%;
-      background: #000;
+    .card{
+      background:rgba(17,24,39,.96);
+      border:1px solid var(--line);
+      border-radius:20px;
+      padding:18px;
     }
-
-    .pdf-frame {
-      width: 100%;
-      height: 100%;
-      border: none;
-      background: white;
+    h2,h3{
+      margin-top:0;
     }
-
-    .button-bar {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
-      padding: 16px;
-      background: rgba(0, 0, 0, 0.96);
-      border-top: 1px solid rgba(255,255,255,0.08);
+    label{
+      display:block;
+      margin:14px 0 6px;
+      color:var(--muted);
+      font-size:14px;
     }
-
-    .action-btn {
-      width: 100%;
-      height: 60px;
-      border: none;
-      border-radius: 16px;
-      font-size: 22px;
-      font-weight: 700;
-      cursor: pointer;
-      background: #22c55e;
-      color: white;
+    input, textarea, button{
+      width:100%;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:#0b1220;
+      color:var(--text);
+      padding:12px 14px;
+      font-size:16px;
     }
-
-    .action-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
+    textarea{
+      resize:vertical;
+      min-height:90px;
     }
-
-    .success-overlay {
-      position: absolute;
-      inset: 0;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, 0.78);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.25s ease;
+    button{
+      cursor:pointer;
+      background:var(--accent);
+      border-color:var(--accent);
+      font-weight:700;
+      margin-top:12px;
     }
-
-    .success-overlay.visible {
-      opacity: 1;
-      pointer-events: auto;
+    button.secondary{
+      background:#1e293b;
+      border-color:#475569;
     }
-
-    .success-card {
-      min-width: 340px;
-      background: rgba(15, 23, 42, 0.96);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 24px;
-      padding: 30px;
-      text-align: center;
-      box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+    button.danger{
+      background:var(--danger);
+      border-color:var(--danger);
     }
-
-    .success-card h2 {
-      margin: 0 0 8px;
-      font-size: 30px;
+    .pdf-page{
+      position:relative;
+      width:max-content;
+      max-width:100%;
+      margin:0 auto 18px;
+      background:white;
+      border-radius:12px;
+      overflow:hidden;
+      box-shadow:0 8px 24px rgba(0,0,0,.2);
     }
-
-    .success-card p {
-      margin: 0;
-      color: #cbd5e1;
-      font-size: 16px;
+    .pdf-page canvas{
+      display:block;
+      max-width:100%;
+      height:auto;
+      touch-action:none;
+    }
+    .draw-layer{
+      position:absolute;
+      inset:0;
+      z-index:5;
+      background:transparent;
+    }
+    .page-label{
+      color:#111827;
+      position:absolute;
+      top:10px;
+      left:10px;
+      z-index:7;
+      background:rgba(255,255,255,.92);
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:13px;
+      border:1px solid rgba(0,0,0,.1);
+    }
+    .msg{
+      display:none;
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:12px;
+      font-size:14px;
+      line-height:1.4;
+    }
+    .msg.show{display:block}
+    .msg.ok{background:rgba(22,163,74,.15); border:1px solid rgba(22,163,74,.45)}
+    .msg.err{background:rgba(220,38,38,.15); border:1px solid rgba(220,38,38,.45)}
+    .hidden{display:none !important}
+    .hint{
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.45;
+    }
+    @media (max-width:980px){
+      .live-grid{grid-template-columns:1fr}
     }
   </style>
 </head>
 <body>
-  <div class="app">
-    <div id="standbyScreen" class="screen standby visible">
-      <img src="/logo-portrait.png" alt="Logo">
+  <div class="top">
+    <div class="title">
+      <strong id="titleText">Kiosk</strong>
+      <span class="muted" id="subtitleText">Der Standby-Screen wird geladen</span>
+    </div>
+    <div class="screen-pill" id="screenLabel">Screen 1</div>
+  </div>
+
+  <div class="container">
+    <div id="standbyView" class="standby">
+      <div class="standby-card">
+        <h1>Geschlossen</h1>
+        <p>Der Standby-Screen wird geladen.<br>Bitte warten Sie, bis ein Dokument geöffnet wurde.</p>
+      </div>
     </div>
 
-    <div id="activeScreen" class="screen active">
-      <div class="topbar">
-        <div>
-          <div class="title">Dokument anzeigen</div>
-          <div class="subtitle">Bitte prüfen Sie das Dokument</div>
+    <div id="liveView" class="live-grid hidden">
+      <div class="card">
+        <h2>Dokument</h2>
+        <div class="hint" id="modeHint">Bitte prüfen Sie das Dokument.</div>
+
+        <div id="mode1Form" class="hidden">
+          <label for="name">Name</label>
+          <input id="name" type="text" placeholder="Vor- und Nachname" />
+
+          <label for="email">E-Mail</label>
+          <input id="email" type="email" placeholder="name@mail.de" />
+
+          <label for="phone">Telefonnummer</label>
+          <input id="phone" type="text" placeholder="z. B. 0170..." />
         </div>
-        <div id="screenBadge" class="screen-badge">Screen 1</div>
+
+        <div id="mode3Form" class="hidden">
+          <label for="name3">Name</label>
+          <input id="name3" type="text" placeholder="Vor- und Nachname" />
+
+          <label for="reason">Grund</label>
+          <textarea id="reason" placeholder="Bitte Grund eingeben"></textarea>
+        </div>
+
+        <div id="mode2Box" class="hidden">
+          <div class="hint">Dieses Dokument wird nur angezeigt und muss nicht unterschrieben werden.</div>
+        </div>
+
+        <div id="signTools" class="hidden">
+          <button class="secondary" id="clearAllBtn">Alle Unterschriften löschen</button>
+          <button id="submitBtn">Dokument bestätigen & senden</button>
+        </div>
+
+        <div id="closeOnlyTools" class="hidden">
+          <button class="danger" id="closeDocBtn">Dokument schließen</button>
+        </div>
+
+        <div id="msg" class="msg"></div>
       </div>
 
-      <div class="pdf-wrap">
-        <iframe id="pdfFrame" class="pdf-frame"></iframe>
-      </div>
-
-      <div class="button-bar">
-        <button id="closeBtn" class="action-btn">Schließen</button>
-      </div>
-    </div>
-
-    <div id="successOverlay" class="success-overlay">
-      <div class="success-card">
-        <h2>Geschlossen</h2>
-        <p>Der Standby-Screen wird geladen</p>
+      <div class="card">
+        <h2>PDF Ansicht</h2>
+        <div class="hint" style="margin-bottom:12px">
+          Bei Unterschrift können Sie direkt auf den Seiten unterschreiben.
+        </div>
+        <div id="pdfPages"></div>
       </div>
     </div>
   </div>
 
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const screen = params.get("screen") === "2" ? "2" : "1";
+  <script type="module">
+    import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
-    const standbyScreen = document.getElementById("standbyScreen");
-    const activeScreen = document.getElementById("activeScreen");
-    const pdfFrame = document.getElementById("pdfFrame");
-    const closeBtn = document.getElementById("closeBtn");
-    const successOverlay = document.getElementById("successOverlay");
-    const screenBadge = document.getElementById("screenBadge");
+    const standbyView = document.getElementById("standbyView");
+    const liveView = document.getElementById("liveView");
+    const pdfPages = document.getElementById("pdfPages");
+    const msg = document.getElementById("msg");
 
-    screenBadge.textContent = screen === "2" ? "Screen 2" : "Screen 1";
+    const mode1Form = document.getElementById("mode1Form");
+    const mode2Box = document.getElementById("mode2Box");
+    const mode3Form = document.getElementById("mode3Form");
+    const signTools = document.getElementById("signTools");
+    const closeOnlyTools = document.getElementById("closeOnlyTools");
 
-    let currentFile = null;
-    let isClosing = false;
+    const url = new URL(window.location.href);
+    const screen = url.searchParams.get("screen") === "2" ? "2" : "1";
+    let currentDocVersion = null;
+    let currentDocFile = null;
+    let currentMode = null;
+    let currentSession = null;
+    let pageLayers = [];
+    let pollTimer = null;
+
+    document.getElementById("screenLabel").textContent = `Screen ${screen}`;
+    document.getElementById("titleText").textContent = `Kiosk – Screen ${screen}`;
+
+    function setMsg(text, type = "ok") {
+      msg.className = `msg show ${type}`;
+      msg.textContent = text;
+    }
+
+    function clearMsg() {
+      msg.className = "msg";
+      msg.textContent = "";
+    }
 
     function showStandby() {
-      standbyScreen.classList.add("visible");
-      activeScreen.classList.remove("visible");
-      pdfFrame.src = "";
-      currentFile = null;
+      standbyView.classList.remove("hidden");
+      liveView.classList.add("hidden");
+      document.getElementById("subtitleText").textContent = "Der Standby-Screen wird geladen";
+      currentDocVersion = null;
+      currentDocFile = null;
+      currentMode = null;
+      currentSession = null;
+      pageLayers = [];
+      pdfPages.innerHTML = "";
+      clearMsg();
     }
 
-    function showPdf(fileUrl) {
-      standbyScreen.classList.remove("visible");
-      activeScreen.classList.add("visible");
+    function showLive() {
+      standbyView.classList.add("hidden");
+      liveView.classList.remove("hidden");
+      document.getElementById("subtitleText").textContent = "Bitte prüfen Sie das Dokument";
+    }
 
-      if (currentFile !== fileUrl) {
-        pdfFrame.src = fileUrl;
-        currentFile = fileUrl;
+    function applyMode(mode, session) {
+      currentMode = mode;
+      currentSession = session || null;
+
+      mode1Form.classList.add("hidden");
+      mode2Box.classList.add("hidden");
+      mode3Form.classList.add("hidden");
+      signTools.classList.add("hidden");
+      closeOnlyTools.classList.add("hidden");
+
+      if (mode === "mode1") {
+        mode1Form.classList.remove("hidden");
+        signTools.classList.remove("hidden");
+        document.getElementById("modeHint").textContent = "Bitte Daten prüfen und auf dem Dokument unterschreiben.";
+        document.getElementById("name").value = session?.name || "";
+        document.getElementById("email").value = session?.email || "";
+        document.getElementById("phone").value = session?.phone || "";
+      } else if (mode === "mode3") {
+        mode3Form.classList.remove("hidden");
+        signTools.classList.remove("hidden");
+        document.getElementById("modeHint").textContent = "Bitte Daten prüfen und auf dem Dokument unterschreiben.";
+        document.getElementById("name3").value = session?.name || "";
+        document.getElementById("reason").value = session?.reason || "";
+      } else {
+        mode2Box.classList.remove("hidden");
+        closeOnlyTools.classList.remove("hidden");
+        document.getElementById("modeHint").textContent = "Bitte prüfen Sie das Dokument.";
       }
     }
 
-    function showSuccess() {
-      successOverlay.classList.add("visible");
+    function getSessionPayload() {
+      if (currentMode === "mode1") {
+        return {
+          mode: "mode1",
+          name: document.getElementById("name").value.trim(),
+          email: document.getElementById("email").value.trim(),
+          phone: document.getElementById("phone").value.trim()
+        };
+      }
+      if (currentMode === "mode3") {
+        return {
+          mode: "mode3",
+          name: document.getElementById("name3").value.trim(),
+          reason: document.getElementById("reason").value.trim()
+        };
+      }
+      return { mode: "mode2" };
     }
 
-    function hideSuccess() {
-      successOverlay.classList.remove("visible");
+    async function syncSessionBeforeSign() {
+      const payload = getSessionPayload();
+      const res = await fetch(`/api/session?screen=${screen}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Daten konnten nicht gespeichert werden.");
+      }
+      return data;
     }
 
-    async function loadDocument() {
-      if (isClosing) return;
+    function setupDrawing(drawCanvas) {
+      const ctx = drawCanvas.getContext("2d");
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 2.2;
+      ctx.strokeStyle = "#111827";
 
-      try {
-        const res = await fetch(`/api/document?screen=${screen}&_=${Date.now()}`, {
-          cache: "no-store"
-        });
-        const data = await res.json();
+      let drawing = false;
 
-        if (data.status === "ok" && data.file) {
-          showPdf(data.file);
-        } else {
-          showStandby();
+      function getPoint(e) {
+        const rect = drawCanvas.getBoundingClientRect();
+        const isTouch = e.touches && e.touches[0];
+        const clientX = isTouch ? e.touches[0].clientX : e.clientX;
+        const clientY = isTouch ? e.touches[0].clientY : e.clientY;
+
+        const scaleX = drawCanvas.width / rect.width;
+        const scaleY = drawCanvas.height / rect.height;
+
+        return {
+          x: (clientX - rect.left) * scaleX,
+          y: (clientY - rect.top) * scaleY
+        };
+      }
+
+      function start(e) {
+        e.preventDefault();
+        drawing = true;
+        const p = getPoint(e);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+      }
+
+      function move(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        const p = getPoint(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+      }
+
+      function end(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        drawing = false;
+      }
+
+      drawCanvas.addEventListener("mousedown", start);
+      drawCanvas.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", end);
+
+      drawCanvas.addEventListener("touchstart", start, { passive: false });
+      drawCanvas.addEventListener("touchmove", move, { passive: false });
+      window.addEventListener("touchend", end, { passive: false });
+
+      return {
+        clear() {
+          ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
         }
+      };
+    }
+
+    async function renderPdf(fileUrl) {
+      pdfPages.innerHTML = "";
+      pageLayers = [];
+
+      const loadingTask = pdfjsLib.getDocument(fileUrl);
+      const pdf = await loadingTask.promise;
+
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+        const page = await pdf.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: 1.35 });
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "pdf-page";
+
+        const label = document.createElement("div");
+        label.className = "page-label";
+        label.textContent = `Seite ${pageNumber}`;
+
+        const pdfCanvas = document.createElement("canvas");
+        const pdfCtx = pdfCanvas.getContext("2d");
+        pdfCanvas.width = viewport.width;
+        pdfCanvas.height = viewport.height;
+
+        const drawCanvas = document.createElement("canvas");
+        drawCanvas.className = "draw-layer";
+        drawCanvas.width = viewport.width;
+        drawCanvas.height = viewport.height;
+        drawCanvas.style.width = viewport.width + "px";
+        drawCanvas.style.height = viewport.height + "px";
+
+        await page.render({
+          canvasContext: pdfCtx,
+          viewport
+        }).promise;
+
+        wrapper.appendChild(pdfCanvas);
+        wrapper.appendChild(drawCanvas);
+        wrapper.appendChild(label);
+        pdfPages.appendChild(wrapper);
+
+        const tools = setupDrawing(drawCanvas);
+
+        pageLayers.push({
+          pageIndex: pageNumber - 1,
+          pdfCanvas,
+          drawCanvas,
+          clear: tools.clear
+        });
+      }
+    }
+
+    function buildOverlays() {
+      return pageLayers.map(layer => {
+        const merged = document.createElement("canvas");
+        merged.width = layer.pdfCanvas.width;
+        merged.height = layer.pdfCanvas.height;
+        const ctx = merged.getContext("2d");
+        ctx.drawImage(layer.pdfCanvas, 0, 0);
+        ctx.drawImage(layer.drawCanvas, 0, 0);
+
+        return {
+          pageIndex: layer.pageIndex,
+          image: merged.toDataURL("image/png")
+        };
+      });
+    }
+
+    async function submitSigned() {
+      try {
+        clearMsg();
+        await syncSessionBeforeSign();
+
+        const overlays = buildOverlays();
+
+        const res = await fetch(`/api/sign?screen=${screen}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ overlays })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "Signieren fehlgeschlagen.");
+        }
+
+        setMsg("Dokument wurde erfolgreich bestätigt.", "ok");
+        setTimeout(showStandby, 1200);
       } catch (err) {
+        setMsg(err.message || "Fehler beim Bestätigen.", "err");
+      }
+    }
+
+    async function closeDocument() {
+      try {
+        clearMsg();
+        const res = await fetch(`/api/close?screen=${screen}`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "Dokument konnte nicht geschlossen werden.");
+        }
         showStandby();
+      } catch (err) {
+        setMsg(err.message || "Fehler beim Schließen.", "err");
       }
     }
 
-    async function closePdf() {
-      if (isClosing) return;
-
-      isClosing = true;
-      closeBtn.disabled = true;
-
+    async function poll() {
       try {
-        const res = await fetch(`/api/close?screen=${screen}`, {
-          method: "POST"
-        });
+        const res = await fetch(`/api/document?screen=${screen}`, { cache: "no-store" });
         const data = await res.json();
 
-        if (data.success) {
-          showSuccess();
-
-          setTimeout(() => {
-            hideSuccess();
+        if (data.status !== "ok" || !data.file) {
+          if (currentDocVersion !== null) {
             showStandby();
-            closeBtn.disabled = false;
-            isClosing = false;
-          }, 1200);
-        } else {
-          closeBtn.disabled = false;
-          isClosing = false;
-          alert(data.error || "Fehler beim Schließen");
+          }
+          return;
+        }
+
+        if (currentDocVersion !== data.version || currentDocFile !== data.file) {
+          currentDocVersion = data.version;
+          currentDocFile = data.file;
+          showLive();
+          applyMode(data.mode, data.session || null);
+          await renderPdf(`${data.file}?v=${data.version}`);
         }
       } catch (err) {
-        closeBtn.disabled = false;
-        isClosing = false;
-        alert("Fehler beim Schließen");
+        console.error(err);
       }
     }
 
-    closeBtn.addEventListener("click", closePdf);
+    document.getElementById("submitBtn").addEventListener("click", submitSigned);
+    document.getElementById("closeDocBtn").addEventListener("click", closeDocument);
+    document.getElementById("clearAllBtn").addEventListener("click", () => {
+      pageLayers.forEach(layer => layer.clear());
+      clearMsg();
+    });
 
-    loadDocument();
-    setInterval(loadDocument, 2500);
+    showStandby();
+    poll();
+    pollTimer = setInterval(poll, 2000);
   </script>
 </body>
 </html>
