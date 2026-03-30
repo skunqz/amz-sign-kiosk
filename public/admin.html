@@ -1,81 +1,587 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
-<meta charset="UTF-8">
-<title>Admin</title>
-
-<style>
-body {
-  background:#0f172a;
-  color:white;
-  font-family:Arial;
-  padding:20px;
-}
-
-select, button, input {
-  margin:10px 0;
-  padding:10px;
-  width:100%;
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel</title>
+  <style>
+    :root{
+      --bg:#0f172a;
+      --panel:#111827;
+      --panel-2:#1f2937;
+      --line:#334155;
+      --text:#e5e7eb;
+      --muted:#94a3b8;
+      --accent:#3b82f6;
+      --accent-2:#2563eb;
+      --danger:#dc2626;
+      --success:#16a34a;
+      --warning:#f59e0b;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial, Helvetica, sans-serif;
+      background:linear-gradient(180deg,#0b1220 0%, #0f172a 100%);
+      color:var(--text);
+    }
+    .wrap{
+      max-width:1200px;
+      margin:0 auto;
+      padding:24px;
+    }
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:16px;
+      margin-bottom:20px;
+      flex-wrap:wrap;
+    }
+    h1{
+      margin:0;
+      font-size:28px;
+    }
+    .muted{color:var(--muted)}
+    .top-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 380px 1fr;
+      gap:20px;
+    }
+    .card{
+      background:rgba(17,24,39,.95);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:18px;
+      box-shadow:0 10px 25px rgba(0,0,0,.22);
+    }
+    .card h2,.card h3{
+      margin-top:0;
+    }
+    label{
+      display:block;
+      font-size:14px;
+      color:var(--muted);
+      margin:14px 0 6px;
+    }
+    input, select, textarea, button{
+      width:100%;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:#0b1220;
+      color:var(--text);
+      padding:12px 14px;
+      font-size:15px;
+    }
+    textarea{
+      resize:vertical;
+      min-height:96px;
+    }
+    button{
+      cursor:pointer;
+      background:var(--accent);
+      border-color:var(--accent);
+      font-weight:700;
+    }
+    button:hover{background:var(--accent-2)}
+    button.secondary{
+      background:#1e293b;
+      border-color:#475569;
+    }
+    button.secondary:hover{
+      background:#243244;
+    }
+    button.danger{
+      background:var(--danger);
+      border-color:var(--danger);
+    }
+    button.success{
+      background:var(--success);
+      border-color:var(--success);
+    }
+    .row{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+    .mode-grid{
+      display:grid;
+      gap:10px;
+      margin-top:10px;
+    }
+    .mode-card{
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px;
+      background:#0b1220;
+      cursor:pointer;
+    }
+    .mode-card.active{
+      border-color:var(--accent);
+      outline:2px solid rgba(59,130,246,.25);
+      background:#101a2d;
+    }
+    .mode-card strong{
+      display:block;
+      margin-bottom:4px;
+    }
+    .mode-card span{
+      color:var(--muted);
+      font-size:14px;
+    }
+    .status-box{
+      display:grid;
+      gap:10px;
+      margin-top:10px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      border-radius:999px;
+      padding:8px 12px;
+      font-size:14px;
+      border:1px solid var(--line);
+      background:#0b1220;
+      width:max-content;
+    }
+    .dot{
+      width:10px;
+      height:10px;
+      border-radius:50%;
+      background:#64748b;
+    }
+    .dot.live{background:var(--success)}
+    .dot.off{background:var(--danger)}
+    .actions{
+      display:grid;
+      gap:10px;
+      margin-top:16px;
+    }
+    .preview-wrap{
+      display:grid;
+      gap:14px;
+    }
+    .info-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .info{
+      background:#0b1220;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px;
+    }
+    .info small{
+      display:block;
+      color:var(--muted);
+      margin-bottom:6px;
+    }
+    .preview-frame{
+      width:100%;
+      min-height:70vh;
+      border:none;
+      border-radius:14px;
+      background:white;
+    }
+    .msg{
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:12px;
+      display:none;
+      font-size:14px;
+      line-height:1.4;
+    }
+    .msg.show{display:block}
+    .msg.ok{background:rgba(22,163,74,.15); border:1px solid rgba(22,163,74,.4)}
+    .msg.err{background:rgba(220,38,38,.15); border:1px solid rgba(220,38,38,.4)}
+    .hidden{display:none !important}
+    .link-row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .link-row a{
+      color:white;
+      text-decoration:none;
+      background:#1e293b;
+      border:1px solid #475569;
+      padding:10px 14px;
+      border-radius:12px;
+      display:inline-block;
+    }
+    @media (max-width: 980px){
+      .grid{grid-template-columns:1fr}
+      .preview-frame{min-height:55vh}
+      .row,.info-grid{grid-template-columns:1fr}
+    }
+  </style>
 </head>
-
 <body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>Admin Panel</h1>
+        <div class="muted">Wie früher mit 3 Optionen — plus Auswahl für Screen 1 / Screen 2</div>
+      </div>
+      <div class="top-actions">
+        <button class="secondary" id="openSelectBtn">Screen-Auswahl öffnen</button>
+        <button class="secondary" id="openKioskBtn">Aktuellen Kiosk öffnen</button>
+        <button class="danger" id="logoutBtn">Logout</button>
+      </div>
+    </div>
 
-<h1>Admin Panel</h1>
+    <div class="grid">
+      <div class="card">
+        <h2>Einstellungen</h2>
 
-<select id="screen">
-  <option value="1">Screen 1</option>
-  <option value="2">Screen 2</option>
-</select>
+        <label for="screen">Screen</label>
+        <select id="screen">
+          <option value="1">Screen 1</option>
+          <option value="2">Screen 2</option>
+        </select>
 
-<input type="file" id="file">
+        <label>Option auswählen</label>
+        <div class="mode-grid">
+          <div class="mode-card active" data-mode="mode1">
+            <strong>Option 1</strong>
+            <span>Dokument mit Name, E-Mail und Telefonnummer unterschreiben</span>
+          </div>
 
-<button onclick="upload()">PDF hochladen</button>
-<button onclick="closePdf()">PDF schließen</button>
+          <div class="mode-card" data-mode="mode2">
+            <strong>Option 2</strong>
+            <span>Dokument nur anzeigen, ohne Formulardaten</span>
+          </div>
 
-<iframe id="preview" style="width:100%; height:500px;"></iframe>
+          <div class="mode-card" data-mode="mode3">
+            <strong>Option 3</strong>
+            <span>Dokument mit Name und Grund unterschreiben</span>
+          </div>
+        </div>
 
-<script>
-const screenSelect = document.getElementById("screen");
+        <div id="formMode1">
+          <label for="name">Name</label>
+          <input id="name" type="text" placeholder="Vor- und Nachname" />
 
-function currentScreen(){
-  return screenSelect.value;
-}
+          <label for="email">E-Mail</label>
+          <input id="email" type="email" placeholder="name@mail.de" />
 
-async function upload(){
-  const file = document.getElementById("file").files[0];
-  const fd = new FormData();
-  fd.append("pdf", file);
+          <label for="phone">Telefonnummer</label>
+          <input id="phone" type="text" placeholder="z. B. 0170..." />
+        </div>
 
-  await fetch(`/api/upload?screen=${currentScreen()}`, {
-    method:"POST",
-    body: fd
-  });
+        <div id="formMode3" class="hidden">
+          <label for="name3">Name</label>
+          <input id="name3" type="text" placeholder="Vor- und Nachname" />
 
-  load();
-}
+          <label for="reason">Grund</label>
+          <textarea id="reason" placeholder="Bitte Grund eingeben"></textarea>
+        </div>
 
-async function closePdf(){
-  await fetch(`/api/close?screen=${currentScreen()}`, { method:"POST" });
-  load();
-}
+        <div id="formMode2" class="hidden">
+          <div class="msg show ok" style="display:block">
+            Bei Option 2 wird das Dokument nur angezeigt. Es sind keine zusätzlichen Daten notwendig.
+          </div>
+        </div>
 
-async function load(){
-  const res = await fetch(`/api/document?screen=${currentScreen()}`);
-  const data = await res.json();
+        <label for="file">PDF auswählen</label>
+        <input id="file" type="file" accept="application/pdf" />
 
-  if(data.status==="ok"){
-    document.getElementById("preview").src = data.file;
-  } else {
-    document.getElementById("preview").src = "";
-  }
-}
+        <div class="actions">
+          <button class="success" id="saveAndUploadBtn">Daten speichern + PDF hochladen</button>
+          <button class="secondary" id="saveOnlyBtn">Nur Daten speichern</button>
+          <button class="danger" id="closeBtn">Aktive PDF schließen</button>
+        </div>
 
-screenSelect.addEventListener("change", load);
+        <div id="message" class="msg"></div>
+      </div>
 
-load();
-</script>
+      <div class="preview-wrap">
+        <div class="card">
+          <h2>Status</h2>
 
+          <div class="status-box">
+            <div class="pill">
+              <span id="statusDot" class="dot off"></span>
+              <span id="statusText">Inaktiv</span>
+            </div>
+          </div>
+
+          <div class="info-grid" style="margin-top:14px">
+            <div class="info">
+              <small>Aktiver Screen</small>
+              <div id="infoScreen">Screen 1</div>
+            </div>
+            <div class="info">
+              <small>Aktive Option</small>
+              <div id="infoMode">-</div>
+            </div>
+            <div class="info">
+              <small>Aktive Datei</small>
+              <div id="infoFile">-</div>
+            </div>
+            <div class="info">
+              <small>Name</small>
+              <div id="infoName">-</div>
+            </div>
+            <div class="info">
+              <small>Zuletzt unterschrieben von</small>
+              <div id="infoLastSignedName">-</div>
+            </div>
+            <div class="info">
+              <small>Zuletzt unterschrieben am</small>
+              <div id="infoLastSignedAt">-</div>
+            </div>
+          </div>
+
+          <div class="link-row" style="margin-top:14px">
+            <a id="kioskLink" href="/kiosk.html?screen=1" target="_blank">Kiosk für diesen Screen öffnen</a>
+            <a href="/kiosk" target="_blank">Zur Screen-Auswahl</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>PDF Vorschau</h2>
+          <iframe id="preview" class="preview-frame"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const screenSelect = document.getElementById("screen");
+    const modeCards = [...document.querySelectorAll(".mode-card")];
+    const formMode1 = document.getElementById("formMode1");
+    const formMode2 = document.getElementById("formMode2");
+    const formMode3 = document.getElementById("formMode3");
+    const messageBox = document.getElementById("message");
+    const preview = document.getElementById("preview");
+
+    let selectedMode = "mode1";
+
+    function getQueryScreen() {
+      const url = new URL(window.location.href);
+      const screen = url.searchParams.get("screen");
+      return screen === "2" ? "2" : "1";
+    }
+
+    function currentScreen() {
+      return screenSelect.value === "2" ? "2" : "1";
+    }
+
+    function setMessage(text, type = "ok") {
+      messageBox.className = `msg show ${type}`;
+      messageBox.textContent = text;
+    }
+
+    function clearMessage() {
+      messageBox.className = "msg";
+      messageBox.textContent = "";
+    }
+
+    function modeLabel(mode) {
+      if (mode === "mode1") return "Option 1";
+      if (mode === "mode2") return "Option 2";
+      if (mode === "mode3") return "Option 3";
+      return "-";
+    }
+
+    function applyMode(mode) {
+      selectedMode = mode;
+      modeCards.forEach(card => {
+        card.classList.toggle("active", card.dataset.mode === mode);
+      });
+      formMode1.classList.toggle("hidden", mode !== "mode1");
+      formMode2.classList.toggle("hidden", mode !== "mode2");
+      formMode3.classList.toggle("hidden", mode !== "mode3");
+    }
+
+    modeCards.forEach(card => {
+      card.addEventListener("click", () => applyMode(card.dataset.mode));
+    });
+
+    function buildSessionPayload() {
+      if (selectedMode === "mode1") {
+        return {
+          mode: "mode1",
+          name: document.getElementById("name").value.trim(),
+          email: document.getElementById("email").value.trim(),
+          phone: document.getElementById("phone").value.trim()
+        };
+      }
+
+      if (selectedMode === "mode3") {
+        return {
+          mode: "mode3",
+          name: document.getElementById("name3").value.trim(),
+          reason: document.getElementById("reason").value.trim()
+        };
+      }
+
+      return { mode: "mode2" };
+    }
+
+    function fillSession(session) {
+      if (!session) return;
+      applyMode(session.mode || "mode1");
+
+      if (session.mode === "mode1") {
+        document.getElementById("name").value = session.name || "";
+        document.getElementById("email").value = session.email || "";
+        document.getElementById("phone").value = session.phone || "";
+      }
+
+      if (session.mode === "mode3") {
+        document.getElementById("name3").value = session.name || "";
+        document.getElementById("reason").value = session.reason || "";
+      }
+    }
+
+    async function saveSession() {
+      const payload = buildSessionPayload();
+
+      const res = await fetch(`/api/session?screen=${currentScreen()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Session konnte nicht gespeichert werden.");
+      }
+      return data;
+    }
+
+    async function uploadPdf() {
+      const file = document.getElementById("file").files[0];
+      if (!file) {
+        throw new Error("Bitte zuerst eine PDF auswählen.");
+      }
+
+      const fd = new FormData();
+      fd.append("pdf", file);
+
+      const res = await fetch(`/api/upload?screen=${currentScreen()}`, {
+        method: "POST",
+        body: fd
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Upload fehlgeschlagen.");
+      }
+      return data;
+    }
+
+    async function loadStatus() {
+      clearMessage();
+
+      document.getElementById("infoScreen").textContent = `Screen ${currentScreen()}`;
+      document.getElementById("kioskLink").href = `/kiosk.html?screen=${currentScreen()}`;
+
+      const [statusRes, sessionRes, docRes] = await Promise.all([
+        fetch(`/api/status?screen=${currentScreen()}`),
+        fetch(`/api/session?screen=${currentScreen()}`),
+        fetch(`/api/document?screen=${currentScreen()}`)
+      ]);
+
+      if (statusRes.status === 401 || sessionRes.status === 401) {
+        window.location.href = "/admin";
+        return;
+      }
+
+      const status = await statusRes.json();
+      const sessionData = await sessionRes.json();
+      const doc = await docRes.json();
+
+      fillSession(sessionData.session || null);
+
+      document.getElementById("statusDot").className = `dot ${status.active ? "live" : "off"}`;
+      document.getElementById("statusText").textContent = status.active ? "Aktiv" : "Inaktiv";
+      document.getElementById("infoMode").textContent = modeLabel(status.mode);
+      document.getElementById("infoFile").textContent = status.filename || "-";
+      document.getElementById("infoName").textContent = status.name || "-";
+      document.getElementById("infoLastSignedName").textContent = status.lastSignedName || "-";
+      document.getElementById("infoLastSignedAt").textContent = status.lastSignedAt
+        ? new Date(status.lastSignedAt).toLocaleString("de-DE")
+        : "-";
+
+      if (doc.status === "ok" && doc.file) {
+        preview.src = doc.file;
+      } else {
+        preview.src = "";
+      }
+    }
+
+    async function saveOnly() {
+      try {
+        clearMessage();
+        await saveSession();
+        await loadStatus();
+        setMessage("Daten wurden gespeichert.", "ok");
+      } catch (err) {
+        setMessage(err.message || "Fehler beim Speichern.", "err");
+      }
+    }
+
+    async function saveAndUpload() {
+      try {
+        clearMessage();
+        await saveSession();
+        await uploadPdf();
+        document.getElementById("file").value = "";
+        await loadStatus();
+        setMessage("Daten gespeichert und PDF hochgeladen.", "ok");
+      } catch (err) {
+        setMessage(err.message || "Fehler beim Speichern oder Hochladen.", "err");
+      }
+    }
+
+    async function closePdf() {
+      try {
+        clearMessage();
+        const res = await fetch(`/api/close?screen=${currentScreen()}`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "PDF konnte nicht geschlossen werden.");
+        }
+        await loadStatus();
+        setMessage("PDF wurde geschlossen.", "ok");
+      } catch (err) {
+        setMessage(err.message || "Fehler beim Schließen.", "err");
+      }
+    }
+
+    async function logout() {
+      await fetch("/admin/logout", { method: "POST" });
+      window.location.href = "/admin";
+    }
+
+    document.getElementById("saveAndUploadBtn").addEventListener("click", saveAndUpload);
+    document.getElementById("saveOnlyBtn").addEventListener("click", saveOnly);
+    document.getElementById("closeBtn").addEventListener("click", closePdf);
+    document.getElementById("logoutBtn").addEventListener("click", logout);
+
+    document.getElementById("openSelectBtn").addEventListener("click", () => {
+      window.open("/kiosk", "_blank");
+    });
+
+    document.getElementById("openKioskBtn").addEventListener("click", () => {
+      window.open(`/kiosk.html?screen=${currentScreen()}`, "_blank");
+    });
+
+    screenSelect.addEventListener("change", loadStatus);
+
+    screenSelect.value = getQueryScreen();
+    applyMode("mode1");
+    loadStatus();
+  </script>
 </body>
 </html>
