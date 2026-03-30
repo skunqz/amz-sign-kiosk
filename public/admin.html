@@ -22,7 +22,9 @@
     body{
       margin:0;
       font-family:Arial, Helvetica, sans-serif;
-      background:linear-gradient(180deg,#0b1220 0%, #0f172a 100%);
+      background:
+        radial-gradient(circle at top right, rgba(59,130,246,.14), transparent 26%),
+        linear-gradient(180deg,#0b1220 0%, #0f172a 100%);
       color:var(--text);
     }
 
@@ -39,6 +41,22 @@
       gap:16px;
       margin-bottom:20px;
       flex-wrap:wrap;
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:14px;
+    }
+
+    .brand-logo{
+      width:52px;
+      height:52px;
+      object-fit:contain;
+      border-radius:14px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.06);
+      padding:6px;
     }
 
     h1{
@@ -58,16 +76,17 @@
 
     .grid{
       display:grid;
-      grid-template-columns:400px 1fr;
+      grid-template-columns:420px 1fr;
       gap:20px;
     }
 
     .card{
       background:rgba(17,24,39,.96);
       border:1px solid var(--line);
-      border-radius:18px;
+      border-radius:22px;
       padding:18px;
-      box-shadow:0 10px 25px rgba(0,0,0,.22);
+      box-shadow:0 12px 30px rgba(0,0,0,.24);
+      backdrop-filter: blur(8px);
     }
 
     .card h2{
@@ -83,7 +102,7 @@
 
     input, select, textarea, button{
       width:100%;
-      border-radius:12px;
+      border-radius:14px;
       border:1px solid var(--line);
       background:#0b1220;
       color:var(--text);
@@ -101,15 +120,19 @@
       background:var(--accent);
       border-color:var(--accent);
       font-weight:700;
+      transition:transform .15s ease, background .15s ease, box-shadow .15s ease;
+      box-shadow:0 8px 20px rgba(37,99,235,.18);
     }
 
     button:hover{
       background:var(--accent-2);
+      transform:translateY(-1px);
     }
 
     button.secondary{
       background:#1e293b;
       border-color:#475569;
+      box-shadow:none;
     }
 
     button.secondary:hover{
@@ -119,37 +142,49 @@
     button.danger{
       background:var(--danger);
       border-color:var(--danger);
+      box-shadow:none;
     }
 
     button.success{
       background:var(--success);
       border-color:var(--success);
+      box-shadow:none;
     }
 
     .mode-grid{
       display:grid;
-      gap:10px;
+      gap:12px;
       margin-top:10px;
     }
 
     .mode-card{
       border:1px solid var(--line);
-      border-radius:14px;
-      padding:12px;
-      background:#0b1220;
+      border-radius:16px;
+      padding:14px;
+      background:linear-gradient(180deg,#0b1220 0%, #101827 100%);
       cursor:pointer;
-      transition:.15s ease;
+      transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+      transform:scale(1);
+    }
+
+    .mode-card:hover{
+      transform:translateY(-2px);
+      border-color:#4b5563;
+      box-shadow:0 10px 25px rgba(0,0,0,.18);
     }
 
     .mode-card.active{
       border-color:var(--accent);
-      outline:2px solid rgba(59,130,246,.22);
-      background:#101a2d;
+      outline:2px solid rgba(59,130,246,.18);
+      background:linear-gradient(180deg,#12203a 0%, #101a2d 100%);
+      transform:scale(1.02);
+      box-shadow:0 12px 28px rgba(37,99,235,.12);
     }
 
     .mode-card strong{
       display:block;
       margin-bottom:4px;
+      font-size:16px;
     }
 
     .mode-card span{
@@ -219,7 +254,7 @@
       width:100%;
       min-height:74vh;
       border:none;
-      border-radius:14px;
+      border-radius:16px;
       background:#000;
     }
 
@@ -230,6 +265,7 @@
       display:none;
       font-size:14px;
       line-height:1.4;
+      animation:fadeIn .25s ease;
     }
 
     .msg.show{display:block}
@@ -252,6 +288,23 @@
       padding:10px 14px;
       border-radius:12px;
       display:inline-block;
+      transition:transform .15s ease, background .15s ease;
+    }
+
+    .link-row a:hover{
+      background:#243244;
+      transform:translateY(-1px);
+    }
+
+    @keyframes fadeIn{
+      from{
+        opacity:0;
+        transform:translateY(6px);
+      }
+      to{
+        opacity:1;
+        transform:translateY(0);
+      }
     }
 
     @media (max-width:1100px){
@@ -264,10 +317,14 @@
 <body>
   <div class="wrap">
     <div class="topbar">
-      <div>
-        <h1>Admin Panel</h1>
-        <div class="muted">PDF auswählen und direkt hochladen</div>
+      <div class="brand">
+        <img src="/logo.png" alt="Logo" class="brand-logo" />
+        <div>
+          <h1>Admin Panel</h1>
+          <div class="muted">PDF auswählen und direkt hochladen</div>
+        </div>
       </div>
+
       <div class="top-actions">
         <button class="secondary" id="openKioskBtn">Aktuellen Kiosk öffnen</button>
         <button class="danger" id="logoutBtn">Logout</button>
@@ -288,7 +345,7 @@
         <div class="mode-grid">
           <div class="mode-card active" data-mode="mode1">
             <strong>Option 1</strong>
-            <span>Dokument mit Name, E-Mail und Telefonnummer unterschreiben</span>
+            <span>Dokument mit Name, E-Mail, Telefonnummer und KFZ-Kennzeichen unterschreiben</span>
           </div>
 
           <div class="mode-card" data-mode="mode2">
@@ -298,7 +355,7 @@
 
           <div class="mode-card" data-mode="mode3">
             <strong>Option 3</strong>
-            <span>Dokument mit Name und Grund unterschreiben</span>
+            <span>Dokument mit Name, KFZ-Kennzeichen und Grund unterschreiben</span>
           </div>
         </div>
 
@@ -311,11 +368,17 @@
 
           <label for="phone">Telefonnummer</label>
           <input id="phone" type="text" placeholder="z. B. 0170..." />
+
+          <label for="plate">KFZ-Kennzeichen</label>
+          <input id="plate" type="text" placeholder="z. B. FR-AB 123" />
         </div>
 
         <div id="formMode3" class="hidden">
           <label for="name3">Name</label>
           <input id="name3" type="text" placeholder="Vor- und Nachname" />
+
+          <label for="plate3">KFZ-Kennzeichen</label>
+          <input id="plate3" type="text" placeholder="z. B. FR-AB 123" />
 
           <label for="reason">Grund</label>
           <textarea id="reason" placeholder="Bitte Grund eingeben"></textarea>
@@ -454,7 +517,8 @@
           mode: "mode1",
           name: document.getElementById("name").value.trim(),
           email: document.getElementById("email").value.trim(),
-          phone: document.getElementById("phone").value.trim()
+          phone: document.getElementById("phone").value.trim(),
+          plate: document.getElementById("plate").value.trim()
         };
       }
 
@@ -462,6 +526,7 @@
         return {
           mode: "mode3",
           name: document.getElementById("name3").value.trim(),
+          plate: document.getElementById("plate3").value.trim(),
           reason: document.getElementById("reason").value.trim()
         };
       }
@@ -477,17 +542,21 @@
       document.getElementById("name").value = "";
       document.getElementById("email").value = "";
       document.getElementById("phone").value = "";
+      document.getElementById("plate").value = "";
       document.getElementById("name3").value = "";
+      document.getElementById("plate3").value = "";
       document.getElementById("reason").value = "";
 
       if (session.mode === "mode1") {
         document.getElementById("name").value = session.name || "";
         document.getElementById("email").value = session.email || "";
         document.getElementById("phone").value = session.phone || "";
+        document.getElementById("plate").value = session.plate || "";
       }
 
       if (session.mode === "mode3") {
         document.getElementById("name3").value = session.name || "";
+        document.getElementById("plate3").value = session.plate || "";
         document.getElementById("reason").value = session.reason || "";
       }
     }
