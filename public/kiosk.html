@@ -760,26 +760,32 @@
         overlayCanvas
       };
 
-      const drawCanvas = document.createElement("canvas");
-      drawCanvas.className = "draw-canvas";
-      drawCanvas.width = viewport.width;
-      drawCanvas.height = viewport.height;
-      drawCanvas.style.width = viewport.width + "px";
-      drawCanvas.style.height = viewport.height + "px";
+const wrap = document.createElement("div");
+wrap.className = "page-canvas-wrap";
+wrap.style.width = viewport.width + "px";
+wrap.style.height = viewport.height + "px";
 
-      const wrap = document.createElement("div");
-      wrap.className = "page-canvas-wrap";
-      wrap.style.width = viewport.width + "px";
-      wrap.style.height = viewport.height + "px";
+wrap.appendChild(pdfCanvas);
 
-      wrap.appendChild(pdfCanvas);
-      wrap.appendChild(drawCanvas);
+let drawCanvas = null;
 
-      pageFrame.innerHTML = "";
-      pageFrame.appendChild(wrap);
+if (currentMode === "mode1" || currentMode === "mode3") {
+  drawCanvas = document.createElement("canvas");
+  drawCanvas.className = "draw-canvas";
+  drawCanvas.width = viewport.width;
+  drawCanvas.height = viewport.height;
+  drawCanvas.style.width = viewport.width + "px";
+  drawCanvas.style.height = viewport.height + "px";
 
-      const tools = setupDrawing(drawCanvas, overlayCanvas);
-      drawCanvas._clearOverlay = tools.clear;
+  wrap.appendChild(drawCanvas);
+}
+
+pageFrame.innerHTML = "";
+pageFrame.appendChild(wrap);
+
+if (drawCanvas) {
+  const tools = setupDrawing(drawCanvas, overlayCanvas);
+  drawCanvas._clearOverlay = tools.clear;
 
       updatePageIndicator();
     }
@@ -805,11 +811,13 @@
     }
 
     function clearCurrentPage() {
-      const drawCanvas = pageFrame.querySelector(".draw-canvas");
-      if (drawCanvas && typeof drawCanvas._clearOverlay === "function") {
-        drawCanvas._clearOverlay();
-      }
-    }
+  if (currentMode !== "mode1" && currentMode !== "mode3") return;
+
+  const drawCanvas = pageFrame.querySelector(".draw-canvas");
+  if (drawCanvas && typeof drawCanvas._clearOverlay === "function") {
+    drawCanvas._clearOverlay();
+  }
+}
 
     function buildOverlaysPayload() {
       const result = [];
