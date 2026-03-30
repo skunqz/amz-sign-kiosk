@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Screen auswählen</title>
+  <style>
+    :root{
+      --bg:#0f172a;
+      --panel:#111827;
+      --line:#334155;
+      --text:#e5e7eb;
+      --muted:#94a3b8;
+      --accent:#2563eb;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:Arial, Helvetica, sans-serif;
+      background:linear-gradient(180deg,#0b1220 0%, #0f172a 100%);
+      color:var(--text);
+      display:grid;
+      place-items:center;
+      padding:24px;
+    }
+    .card{
+      width:min(720px,100%);
+      background:rgba(17,24,39,.96);
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:28px;
+      box-shadow:0 20px 40px rgba(0,0,0,.28);
+    }
+    h1{margin:0 0 8px;font-size:32px}
+    p{margin:0 0 24px;color:var(--muted)}
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+    }
+    .screen-card{
+      background:#0b1220;
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:18px;
+    }
+    .screen-card h2{
+      margin:0 0 12px;
+      font-size:24px;
+    }
+    .btns{
+      display:grid;
+      gap:10px;
+    }
+    a{
+      display:block;
+      text-decoration:none;
+      text-align:center;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      color:white;
+      background:#1e293b;
+      font-weight:700;
+    }
+    a.primary{
+      background:var(--accent);
+      border-color:var(--accent);
+    }
+    @media (max-width:700px){
+      .grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Screen auswählen</h1>
+    <p>Wähle, ob du den Kiosk oder das Admin Panel für Screen 1 oder Screen 2 öffnen möchtest.</p>
+
+    <div class="grid">
+      <div class="screen-card">
+        <h2>Screen 1</h2>
+        <div class="btns">
+          <a class="primary" href="/kiosk.html?screen=1">Kiosk öffnen</a>
+          <a href="/admin?screen=1">Admin öffnen</a>
+        </div>
+      </div>
+
+      <div class="screen-card">
+        <h2>Screen 2</h2>
+        <div class="btns">
+          <a class="primary" href="/kiosk.html?screen=2">Kiosk öffnen</a>
+          <a href="/admin?screen=2">Admin öffnen</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
