@@ -4,250 +4,473 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Kiosk</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
   <style>
     :root{
-      --bg:#0f172a;
+      --bg:#0b1220;
       --panel:#111827;
       --line:#334155;
       --text:#e5e7eb;
       --muted:#94a3b8;
       --accent:#2563eb;
+      --accent-dark:#1d4ed8;
       --danger:#dc2626;
       --success:#16a34a;
     }
-    *{box-sizing:border-box}
-    body{
+
+    *{ box-sizing:border-box; }
+
+    html, body{
       margin:0;
+      width:100%;
+      height:100%;
       font-family:Arial, Helvetica, sans-serif;
-      background:#0b1220;
+      background:var(--bg);
       color:var(--text);
+      overflow:hidden;
+      touch-action:manipulation;
     }
-    .top{
-      position:sticky;
-      top:0;
-      z-index:20;
-      background:rgba(15,23,42,.96);
-      border-bottom:1px solid var(--line);
-      padding:14px 18px;
+
+    body{
+      display:flex;
+      flex-direction:column;
+    }
+
+    .topbar{
+      flex:0 0 auto;
+      height:72px;
       display:flex;
       align-items:center;
       justify-content:space-between;
-      gap:12px;
-      flex-wrap:wrap;
+      gap:16px;
+      padding:14px 18px;
+      background:rgba(15,23,42,.96);
+      border-bottom:1px solid var(--line);
     }
-    .title{
+
+    .topbar-left{
       display:flex;
       flex-direction:column;
       gap:4px;
+      min-width:0;
     }
-    .title strong{
-      font-size:20px;
+
+    .title{
+      font-size:24px;
+      font-weight:700;
     }
-    .muted{color:var(--muted)}
-    .screen-pill{
-      background:#1e293b;
-      border:1px solid #475569;
-      padding:8px 12px;
+
+    .subtitle{
+      color:var(--muted);
+      font-size:15px;
+    }
+
+    .screen-badge{
+      padding:10px 14px;
       border-radius:999px;
+      border:1px solid #475569;
+      background:#1e293b;
+      font-size:15px;
+      white-space:nowrap;
     }
-    .container{
-      padding:18px;
-      max-width:1200px;
-      margin:0 auto;
+
+    .main{
+      flex:1 1 auto;
+      min-height:0;
+      position:relative;
+      overflow:hidden;
     }
+
+    /* STANDBY */
     .standby{
-      min-height:calc(100vh - 90px);
-      display:grid;
-      place-items:center;
-      text-align:center;
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      background:
+        radial-gradient(circle at top, rgba(37,99,235,.18), transparent 35%),
+        linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
     }
+
     .standby-card{
-      width:min(700px,100%);
-      background:rgba(17,24,39,.96);
+      width:min(760px, 92vw);
+      min-height:70vh;
+      border-radius:28px;
       border:1px solid var(--line);
-      border-radius:24px;
-      padding:34px 22px;
-      box-shadow:0 20px 40px rgba(0,0,0,.25);
+      background:rgba(17,24,39,.92);
+      box-shadow:0 20px 60px rgba(0,0,0,.35);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding:40px 28px;
+      gap:22px;
     }
-    .standby-card h1{
-      margin:0 0 10px;
-      font-size:40px;
+
+    .standby-logo-wrap{
+      width:min(320px, 62vw);
+      height:min(320px, 32vh);
+      display:flex;
+      align-items:center;
+      justify-content:center;
     }
-    .standby-card p{
+
+    .standby-logo{
+      max-width:100%;
+      max-height:100%;
+      object-fit:contain;
+      display:block;
+    }
+
+    .standby-fallback{
+      width:180px;
+      height:180px;
+      border-radius:32px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:64px;
+      font-weight:800;
+      background:#0f172a;
+      border:1px solid var(--line);
+      color:#60a5fa;
+    }
+
+    .standby h1{
+      margin:0;
+      font-size:42px;
+      line-height:1.1;
+    }
+
+    .standby p{
       margin:0;
       color:var(--muted);
-      font-size:18px;
+      font-size:22px;
       line-height:1.5;
+      max-width:560px;
     }
-    .live-grid{
+
+    /* LIVE */
+    .live{
+      position:absolute;
+      inset:0;
+      display:flex;
+      flex-direction:column;
+      min-height:0;
+      background:#0b1220;
+    }
+
+    .hidden{
+      display:none !important;
+    }
+
+    .content{
+      flex:1 1 auto;
+      min-height:0;
       display:grid;
-      grid-template-columns:340px 1fr;
-      gap:18px;
-      align-items:start;
+      grid-template-columns: 1fr;
+      overflow:hidden;
     }
-    .card{
-      background:rgba(17,24,39,.96);
-      border:1px solid var(--line);
-      border-radius:20px;
-      padding:18px;
+
+    .doc-stage{
+      position:relative;
+      height:100%;
+      min-height:0;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:14px 84px;
     }
-    h2,h3{
-      margin-top:0;
-    }
-    label{
-      display:block;
-      margin:14px 0 6px;
-      color:var(--muted);
-      font-size:14px;
-    }
-    input, textarea, button{
+
+    .pdf-shell{
+      position:relative;
       width:100%;
-      border-radius:12px;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .page-frame{
+      position:relative;
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .page-canvas-wrap{
+      position:relative;
+      display:inline-block;
+      background:white;
+      border-radius:18px;
+      overflow:hidden;
+      box-shadow:0 18px 50px rgba(0,0,0,.35);
+      max-width:100%;
+      max-height:100%;
+      touch-action:none;
+    }
+
+    .page-canvas-wrap canvas{
+      display:block;
+      max-width:100%;
+      max-height:100%;
+      touch-action:none;
+    }
+
+    .pdf-canvas{
+      position:relative;
+      z-index:1;
+    }
+
+    .draw-canvas{
+      position:absolute;
+      inset:0;
+      z-index:2;
+      background:transparent;
+    }
+
+    .page-indicator{
+      position:absolute;
+      top:16px;
+      left:16px;
+      z-index:5;
+      background:rgba(255,255,255,.94);
+      color:#111827;
+      border:1px solid rgba(0,0,0,.08);
+      border-radius:999px;
+      padding:10px 14px;
+      font-weight:700;
+      font-size:15px;
+    }
+
+    .nav-btn{
+      position:absolute;
+      top:50%;
+      transform:translateY(-50%);
+      z-index:10;
+      width:72px;
+      height:72px;
+      border:none;
+      border-radius:999px;
+      background:rgba(30,41,59,.92);
+      color:white;
+      font-size:34px;
+      font-weight:700;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 8px 24px rgba(0,0,0,.3);
+      cursor:pointer;
+      user-select:none;
+      -webkit-user-select:none;
+    }
+
+    .nav-btn:active{
+      transform:translateY(-50%) scale(.97);
+    }
+
+    .nav-left{ left:10px; }
+    .nav-right{ right:10px; }
+
+    .bottom-panel{
+      flex:0 0 auto;
+      border-top:1px solid var(--line);
+      background:rgba(15,23,42,.98);
+      padding:14px;
+      display:grid;
+      gap:12px;
+    }
+
+    .fields{
+      display:grid;
+      gap:12px;
+      grid-template-columns:1fr;
+    }
+
+    .field{
+      display:grid;
+      gap:6px;
+    }
+
+    .field label{
+      font-size:14px;
+      color:var(--muted);
+      font-weight:700;
+    }
+
+    .field input,
+    .field textarea{
+      width:100%;
+      border-radius:14px;
       border:1px solid var(--line);
       background:#0b1220;
       color:var(--text);
-      padding:12px 14px;
-      font-size:16px;
+      padding:14px 16px;
+      font-size:18px;
+      outline:none;
     }
-    textarea{
-      resize:vertical;
+
+    .field textarea{
+      resize:none;
       min-height:90px;
     }
-    button{
+
+    .actions{
+      display:grid;
+      gap:10px;
+      grid-template-columns:1fr 1fr;
+    }
+
+    .actions.single{
+      grid-template-columns:1fr;
+    }
+
+    .btn{
+      border:none;
+      border-radius:16px;
+      padding:16px 18px;
+      font-size:20px;
+      font-weight:800;
       cursor:pointer;
-      background:var(--accent);
-      border-color:var(--accent);
-      font-weight:700;
-      margin-top:12px;
+      color:white;
     }
-    button.secondary{
-      background:#1e293b;
-      border-color:#475569;
-    }
-    button.danger{
-      background:var(--danger);
-      border-color:var(--danger);
-    }
-    .pdf-page{
-      position:relative;
-      width:max-content;
-      max-width:100%;
-      margin:0 auto 18px;
-      background:white;
-      border-radius:12px;
-      overflow:hidden;
-      box-shadow:0 8px 24px rgba(0,0,0,.2);
-    }
-    .pdf-page canvas{
-      display:block;
-      max-width:100%;
-      height:auto;
-      touch-action:none;
-    }
-    .draw-layer{
-      position:absolute;
-      inset:0;
-      z-index:5;
-      background:transparent;
-    }
-    .page-label{
-      color:#111827;
-      position:absolute;
-      top:10px;
-      left:10px;
-      z-index:7;
-      background:rgba(255,255,255,.92);
-      padding:6px 10px;
-      border-radius:999px;
-      font-size:13px;
-      border:1px solid rgba(0,0,0,.1);
-    }
+
+    .btn-primary{ background:var(--accent); }
+    .btn-primary:active{ background:var(--accent-dark); }
+
+    .btn-secondary{ background:#334155; }
+    .btn-danger{ background:var(--danger); }
+
     .msg{
       display:none;
-      margin-top:12px;
-      padding:12px 14px;
-      border-radius:12px;
-      font-size:14px;
+      padding:14px 16px;
+      border-radius:14px;
+      font-size:16px;
       line-height:1.4;
     }
-    .msg.show{display:block}
-    .msg.ok{background:rgba(22,163,74,.15); border:1px solid rgba(22,163,74,.45)}
-    .msg.err{background:rgba(220,38,38,.15); border:1px solid rgba(220,38,38,.45)}
-    .hidden{display:none !important}
+
+    .msg.show{ display:block; }
+    .msg.ok{
+      background:rgba(22,163,74,.16);
+      border:1px solid rgba(22,163,74,.45);
+    }
+    .msg.err{
+      background:rgba(220,38,38,.16);
+      border:1px solid rgba(220,38,38,.45);
+    }
+
     .hint{
       color:var(--muted);
-      font-size:14px;
+      font-size:16px;
       line-height:1.45;
     }
-    @media (max-width:980px){
-      .live-grid{grid-template-columns:1fr}
+
+    .loading{
+      color:var(--muted);
+      font-size:22px;
+      text-align:center;
+    }
+
+    @media (max-width: 900px){
+      .title{ font-size:21px; }
+      .subtitle{ font-size:14px; }
+      .standby h1{ font-size:34px; }
+      .standby p{ font-size:19px; }
+      .doc-stage{ padding:12px 78px; }
+      .nav-btn{
+        width:66px;
+        height:66px;
+        font-size:30px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="top">
-    <div class="title">
-      <strong id="titleText">Kiosk</strong>
-      <span class="muted" id="subtitleText">Der Standby-Screen wird geladen</span>
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="title" id="titleText">Kiosk</div>
+      <div class="subtitle" id="subtitleText">Standby</div>
     </div>
-    <div class="screen-pill" id="screenLabel">Screen 1</div>
+    <div class="screen-badge" id="screenBadge">Screen 1</div>
   </div>
 
-  <div class="container">
+  <div class="main">
     <div id="standbyView" class="standby">
       <div class="standby-card">
-        <h1>Geschlossen</h1>
-        <p>Der Standby-Screen wird geladen.<br>Bitte warten Sie, bis ein Dokument geöffnet wurde.</p>
+        <div class="standby-logo-wrap">
+          <img id="standbyLogo" class="standby-logo hidden" alt="Logo" />
+          <div id="standbyFallback" class="standby-fallback">K</div>
+        </div>
+        <h1>Willkommen</h1>
+        <p>
+          Bitte warten Sie, bis ein Dokument geöffnet wird.
+        </p>
       </div>
     </div>
 
-    <div id="liveView" class="live-grid hidden">
-      <div class="card">
-        <h2>Dokument</h2>
-        <div class="hint" id="modeHint">Bitte prüfen Sie das Dokument.</div>
+    <div id="liveView" class="live hidden">
+      <div class="content">
+        <div class="doc-stage">
+          <button id="prevBtn" class="nav-btn nav-left" type="button">‹</button>
+          <div class="pdf-shell">
+            <div class="page-frame" id="pageFrame">
+              <div class="loading" id="loadingText">Dokument wird geladen …</div>
+            </div>
+          </div>
+          <button id="nextBtn" class="nav-btn nav-right" type="button">›</button>
+        </div>
+      </div>
 
-        <div id="mode1Form" class="hidden">
-          <label for="name">Name</label>
-          <input id="name" type="text" placeholder="Vor- und Nachname" />
+      <div class="bottom-panel">
+        <div class="page-indicator" id="pageIndicator">Seite 1 / 1</div>
 
-          <label for="email">E-Mail</label>
-          <input id="email" type="email" placeholder="name@mail.de" />
+        <div id="modeHint" class="hint">Bitte prüfen Sie das Dokument.</div>
 
-          <label for="phone">Telefonnummer</label>
-          <input id="phone" type="text" placeholder="z. B. 0170..." />
+        <div id="mode1Fields" class="fields hidden">
+          <div class="field">
+            <label for="name">Name</label>
+            <input id="name" type="text" placeholder="Vor- und Nachname" />
+          </div>
+          <div class="field">
+            <label for="email">E-Mail</label>
+            <input id="email" type="email" placeholder="name@mail.de" />
+          </div>
+          <div class="field">
+            <label for="phone">Telefonnummer</label>
+            <input id="phone" type="text" placeholder="z. B. 0170..." />
+          </div>
         </div>
 
-        <div id="mode3Form" class="hidden">
-          <label for="name3">Name</label>
-          <input id="name3" type="text" placeholder="Vor- und Nachname" />
-
-          <label for="reason">Grund</label>
-          <textarea id="reason" placeholder="Bitte Grund eingeben"></textarea>
+        <div id="mode3Fields" class="fields hidden">
+          <div class="field">
+            <label for="name3">Name</label>
+            <input id="name3" type="text" placeholder="Vor- und Nachname" />
+          </div>
+          <div class="field">
+            <label for="reason">Grund</label>
+            <textarea id="reason" placeholder="Bitte Grund eingeben"></textarea>
+          </div>
         </div>
 
-        <div id="mode2Box" class="hidden">
-          <div class="hint">Dieses Dokument wird nur angezeigt und muss nicht unterschrieben werden.</div>
+        <div id="mode2Info" class="hint hidden">
+          Dieses Dokument wird nur angezeigt. Über „Dokument schließen“ kann es beendet werden.
         </div>
 
-        <div id="signTools" class="hidden">
-          <button class="secondary" id="clearAllBtn">Alle Unterschriften löschen</button>
-          <button id="submitBtn">Dokument bestätigen & senden</button>
+        <div id="signActions" class="actions hidden">
+          <button type="button" class="btn btn-secondary" id="clearPageBtn">Seite leeren</button>
+          <button type="button" class="btn btn-primary" id="submitBtn">Dokument bestätigen</button>
         </div>
 
-        <div id="closeOnlyTools" class="hidden">
-          <button class="danger" id="closeDocBtn">Dokument schließen</button>
+        <div id="viewActions" class="actions single hidden">
+          <button type="button" class="btn btn-danger" id="closeBtn">Dokument schließen</button>
         </div>
 
         <div id="msg" class="msg"></div>
-      </div>
-
-      <div class="card">
-        <h2>PDF Ansicht</h2>
-        <div class="hint" style="margin-bottom:12px">
-          Bei Unterschrift können Sie direkt auf den Seiten unterschreiben.
-        </div>
-        <div id="pdfPages"></div>
       </div>
     </div>
   </div>
@@ -256,28 +479,66 @@
     import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
     pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
-    const standbyView = document.getElementById("standbyView");
-    const liveView = document.getElementById("liveView");
-    const pdfPages = document.getElementById("pdfPages");
-    const msg = document.getElementById("msg");
-
-    const mode1Form = document.getElementById("mode1Form");
-    const mode2Box = document.getElementById("mode2Box");
-    const mode3Form = document.getElementById("mode3Form");
-    const signTools = document.getElementById("signTools");
-    const closeOnlyTools = document.getElementById("closeOnlyTools");
+    const STANDBY_LOGO = "/logo.png";
 
     const url = new URL(window.location.href);
     const screen = url.searchParams.get("screen") === "2" ? "2" : "1";
-    let currentDocVersion = null;
-    let currentDocFile = null;
+
+    const standbyView = document.getElementById("standbyView");
+    const liveView = document.getElementById("liveView");
+    const titleText = document.getElementById("titleText");
+    const subtitleText = document.getElementById("subtitleText");
+    const screenBadge = document.getElementById("screenBadge");
+    const standbyLogo = document.getElementById("standbyLogo");
+    const standbyFallback = document.getElementById("standbyFallback");
+
+    const pageFrame = document.getElementById("pageFrame");
+    const pageIndicator = document.getElementById("pageIndicator");
+    const loadingText = document.getElementById("loadingText");
+
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+
+    const modeHint = document.getElementById("modeHint");
+    const mode1Fields = document.getElementById("mode1Fields");
+    const mode3Fields = document.getElementById("mode3Fields");
+    const mode2Info = document.getElementById("mode2Info");
+    const signActions = document.getElementById("signActions");
+    const viewActions = document.getElementById("viewActions");
+
+    const msg = document.getElementById("msg");
+
+    const nameInput = document.getElementById("name");
+    const emailInput = document.getElementById("email");
+    const phoneInput = document.getElementById("phone");
+    const name3Input = document.getElementById("name3");
+    const reasonInput = document.getElementById("reason");
+
+    let currentPdfUrl = null;
+    let currentVersion = null;
     let currentMode = null;
     let currentSession = null;
-    let pageLayers = [];
+
+    let pdfDoc = null;
+    let currentPage = 1;
+    let pageStates = []; // [{ pdfCanvas, drawCanvas }]
+    let renderToken = 0;
     let pollTimer = null;
 
-    document.getElementById("screenLabel").textContent = `Screen ${screen}`;
-    document.getElementById("titleText").textContent = `Kiosk – Screen ${screen}`;
+    titleText.textContent = `Kiosk – Screen ${screen}`;
+    screenBadge.textContent = `Screen ${screen}`;
+
+    const logoTest = new Image();
+    logoTest.onload = () => {
+      standbyLogo.src = STANDBY_LOGO;
+      standbyLogo.classList.remove("hidden");
+      standbyFallback.classList.add("hidden");
+    };
+    logoTest.onerror = () => {
+      standbyLogo.classList.add("hidden");
+      standbyFallback.classList.remove("hidden");
+    };
+    logoTest.src = STANDBY_LOGO;
 
     function setMsg(text, type = "ok") {
       msg.className = `msg show ${type}`;
@@ -292,49 +553,51 @@
     function showStandby() {
       standbyView.classList.remove("hidden");
       liveView.classList.add("hidden");
-      document.getElementById("subtitleText").textContent = "Der Standby-Screen wird geladen";
-      currentDocVersion = null;
-      currentDocFile = null;
+      subtitleText.textContent = "Standby";
+      currentPdfUrl = null;
+      currentVersion = null;
       currentMode = null;
       currentSession = null;
-      pageLayers = [];
-      pdfPages.innerHTML = "";
+      pdfDoc = null;
+      currentPage = 1;
+      pageStates = [];
+      pageFrame.innerHTML = '<div class="loading" id="loadingText">Dokument wird geladen …</div>';
       clearMsg();
     }
 
     function showLive() {
       standbyView.classList.add("hidden");
       liveView.classList.remove("hidden");
-      document.getElementById("subtitleText").textContent = "Bitte prüfen Sie das Dokument";
+      subtitleText.textContent = "Dokument geöffnet";
     }
 
     function applyMode(mode, session) {
       currentMode = mode;
       currentSession = session || null;
 
-      mode1Form.classList.add("hidden");
-      mode2Box.classList.add("hidden");
-      mode3Form.classList.add("hidden");
-      signTools.classList.add("hidden");
-      closeOnlyTools.classList.add("hidden");
+      mode1Fields.classList.add("hidden");
+      mode3Fields.classList.add("hidden");
+      mode2Info.classList.add("hidden");
+      signActions.classList.add("hidden");
+      viewActions.classList.add("hidden");
 
       if (mode === "mode1") {
-        mode1Form.classList.remove("hidden");
-        signTools.classList.remove("hidden");
-        document.getElementById("modeHint").textContent = "Bitte Daten prüfen und auf dem Dokument unterschreiben.";
-        document.getElementById("name").value = session?.name || "";
-        document.getElementById("email").value = session?.email || "";
-        document.getElementById("phone").value = session?.phone || "";
+        mode1Fields.classList.remove("hidden");
+        signActions.classList.remove("hidden");
+        modeHint.textContent = "Bitte prüfen Sie das Dokument und unterschreiben Sie auf den Seiten.";
+        nameInput.value = session?.name || "";
+        emailInput.value = session?.email || "";
+        phoneInput.value = session?.phone || "";
       } else if (mode === "mode3") {
-        mode3Form.classList.remove("hidden");
-        signTools.classList.remove("hidden");
-        document.getElementById("modeHint").textContent = "Bitte Daten prüfen und auf dem Dokument unterschreiben.";
-        document.getElementById("name3").value = session?.name || "";
-        document.getElementById("reason").value = session?.reason || "";
+        mode3Fields.classList.remove("hidden");
+        signActions.classList.remove("hidden");
+        modeHint.textContent = "Bitte prüfen Sie das Dokument und unterschreiben Sie auf den Seiten.";
+        name3Input.value = session?.name || "";
+        reasonInput.value = session?.reason || "";
       } else {
-        mode2Box.classList.remove("hidden");
-        closeOnlyTools.classList.remove("hidden");
-        document.getElementById("modeHint").textContent = "Bitte prüfen Sie das Dokument.";
+        mode2Info.classList.remove("hidden");
+        viewActions.classList.remove("hidden");
+        modeHint.textContent = "Bitte prüfen Sie das Dokument.";
       }
     }
 
@@ -342,49 +605,69 @@
       if (currentMode === "mode1") {
         return {
           mode: "mode1",
-          name: document.getElementById("name").value.trim(),
-          email: document.getElementById("email").value.trim(),
-          phone: document.getElementById("phone").value.trim()
+          name: nameInput.value.trim(),
+          email: emailInput.value.trim(),
+          phone: phoneInput.value.trim()
         };
       }
+
       if (currentMode === "mode3") {
         return {
           mode: "mode3",
-          name: document.getElementById("name3").value.trim(),
-          reason: document.getElementById("reason").value.trim()
+          name: name3Input.value.trim(),
+          reason: reasonInput.value.trim()
         };
       }
+
       return { mode: "mode2" };
     }
 
-    async function syncSessionBeforeSign() {
+    async function syncSessionForSign() {
       const payload = getSessionPayload();
+
       const res = await fetch(`/api/session?screen=${screen}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
+
       const data = await res.json();
+
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Daten konnten nicht gespeichert werden.");
       }
+
       return data;
+    }
+
+    function updatePageIndicator() {
+      const total = pdfDoc ? pdfDoc.numPages : 1;
+      pageIndicator.textContent = `Seite ${currentPage} / ${total}`;
+      prevBtn.style.visibility = currentPage <= 1 ? "hidden" : "visible";
+      nextBtn.style.visibility = currentPage >= total ? "hidden" : "visible";
+    }
+
+    function createBlankOverlay(width, height) {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      return canvas;
     }
 
     function setupDrawing(drawCanvas) {
       const ctx = drawCanvas.getContext("2d");
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-      ctx.lineWidth = 2.2;
+      ctx.lineWidth = 2.6;
       ctx.strokeStyle = "#111827";
 
       let drawing = false;
 
-      function getPoint(e) {
+      function getPos(event) {
         const rect = drawCanvas.getBoundingClientRect();
-        const isTouch = e.touches && e.touches[0];
-        const clientX = isTouch ? e.touches[0].clientX : e.clientX;
-        const clientY = isTouch ? e.touches[0].clientY : e.clientY;
+        const touch = event.touches && event.touches[0];
+        const clientX = touch ? touch.clientX : event.clientX;
+        const clientY = touch ? touch.clientY : event.clientY;
 
         const scaleX = drawCanvas.width / rect.width;
         const scaleY = drawCanvas.height / rect.height;
@@ -395,25 +678,25 @@
         };
       }
 
-      function start(e) {
-        e.preventDefault();
+      function start(event) {
+        event.preventDefault();
         drawing = true;
-        const p = getPoint(e);
+        const p = getPos(event);
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
       }
 
-      function move(e) {
+      function move(event) {
         if (!drawing) return;
-        e.preventDefault();
-        const p = getPoint(e);
+        event.preventDefault();
+        const p = getPos(event);
         ctx.lineTo(p.x, p.y);
         ctx.stroke();
       }
 
-      function end(e) {
+      function end(event) {
         if (!drawing) return;
-        e.preventDefault();
+        event.preventDefault();
         drawing = false;
       }
 
@@ -424,6 +707,7 @@
       drawCanvas.addEventListener("touchstart", start, { passive: false });
       drawCanvas.addEventListener("touchmove", move, { passive: false });
       window.addEventListener("touchend", end, { passive: false });
+      window.addEventListener("touchcancel", end, { passive: false });
 
       return {
         clear() {
@@ -432,79 +716,162 @@
       };
     }
 
-    async function renderPdf(fileUrl) {
-      pdfPages.innerHTML = "";
-      pageLayers = [];
+    function mergePageWithOverlay(pageIndex) {
+      const state = pageStates[pageIndex];
+      if (!state) return null;
 
-      const loadingTask = pdfjsLib.getDocument(fileUrl);
-      const pdf = await loadingTask.promise;
+      const merged = document.createElement("canvas");
+      merged.width = state.pdfCanvas.width;
+      merged.height = state.pdfCanvas.height;
 
-      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-        const page = await pdf.getPage(pageNumber);
-        const viewport = page.getViewport({ scale: 1.35 });
+      const ctx = merged.getContext("2d");
+      ctx.drawImage(state.pdfCanvas, 0, 0);
+      ctx.drawImage(state.overlayCanvas, 0, 0);
 
-        const wrapper = document.createElement("div");
-        wrapper.className = "pdf-page";
+      return {
+        pageIndex,
+        image: merged.toDataURL("image/png")
+      };
+    }
 
-        const label = document.createElement("div");
-        label.className = "page-label";
-        label.textContent = `Seite ${pageNumber}`;
+    function buildOverlaysPayload() {
+      const result = [];
+      for (let i = 0; i < pageStates.length; i++) {
+        const merged = mergePageWithOverlay(i);
+        if (merged) result.push(merged);
+      }
+      return result;
+    }
 
-        const pdfCanvas = document.createElement("canvas");
-        const pdfCtx = pdfCanvas.getContext("2d");
-        pdfCanvas.width = viewport.width;
-        pdfCanvas.height = viewport.height;
+    function clearCurrentPage() {
+      const state = pageStates[currentPage - 1];
+      if (!state) return;
 
-        const drawCanvas = document.createElement("canvas");
-        drawCanvas.className = "draw-layer";
-        drawCanvas.width = viewport.width;
-        drawCanvas.height = viewport.height;
-        drawCanvas.style.width = viewport.width + "px";
-        drawCanvas.style.height = viewport.height + "px";
+      const ctx = state.overlayCanvas.getContext("2d");
+      ctx.clearRect(0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
 
-        await page.render({
-          canvasContext: pdfCtx,
-          viewport
-        }).promise;
-
-        wrapper.appendChild(pdfCanvas);
-        wrapper.appendChild(drawCanvas);
-        wrapper.appendChild(label);
-        pdfPages.appendChild(wrapper);
-
-        const tools = setupDrawing(drawCanvas);
-
-        pageLayers.push({
-          pageIndex: pageNumber - 1,
-          pdfCanvas,
-          drawCanvas,
-          clear: tools.clear
-        });
+      const liveCanvas = pageFrame.querySelector(".draw-canvas");
+      if (liveCanvas) {
+        const liveCtx = liveCanvas.getContext("2d");
+        liveCtx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
       }
     }
 
-    function buildOverlays() {
-      return pageLayers.map(layer => {
-        const merged = document.createElement("canvas");
-        merged.width = layer.pdfCanvas.width;
-        merged.height = layer.pdfCanvas.height;
-        const ctx = merged.getContext("2d");
-        ctx.drawImage(layer.pdfCanvas, 0, 0);
-        ctx.drawImage(layer.drawCanvas, 0, 0);
+    async function renderCurrentPage() {
+      if (!pdfDoc) return;
 
-        return {
-          pageIndex: layer.pageIndex,
-          image: merged.toDataURL("image/png")
+      const token = ++renderToken;
+      pageFrame.innerHTML = '<div class="loading">Seite wird geladen …</div>';
+      updatePageIndicator();
+
+      const page = await pdfDoc.getPage(currentPage);
+      if (token !== renderToken) return;
+
+      const frameRect = pageFrame.getBoundingClientRect();
+      const maxWidth = Math.max(200, frameRect.width - 10);
+      const maxHeight = Math.max(200, frameRect.height - 10);
+
+      const rawViewport = page.getViewport({ scale: 1 });
+      const scale = Math.min(maxWidth / rawViewport.width, maxHeight / rawViewport.height);
+      const viewport = page.getViewport({ scale });
+
+      const pdfCanvas = document.createElement("canvas");
+      pdfCanvas.className = "pdf-canvas";
+      pdfCanvas.width = viewport.width;
+      pdfCanvas.height = viewport.height;
+
+      const drawCanvas = document.createElement("canvas");
+      drawCanvas.className = "draw-canvas";
+      drawCanvas.width = viewport.width;
+      drawCanvas.height = viewport.height;
+      drawCanvas.style.width = viewport.width + "px";
+      drawCanvas.style.height = viewport.height + "px";
+
+      const pdfCtx = pdfCanvas.getContext("2d");
+      await page.render({ canvasContext: pdfCtx, viewport }).promise;
+      if (token !== renderToken) return;
+
+      if (!pageStates[currentPage - 1]) {
+        pageStates[currentPage - 1] = {
+          pdfCanvas,
+          overlayCanvas: createBlankOverlay(viewport.width, viewport.height),
+          width: viewport.width,
+          height: viewport.height
         };
-      });
+      } else {
+        const existingOverlay = pageStates[currentPage - 1].overlayCanvas;
+        const resized = createBlankOverlay(viewport.width, viewport.height);
+        resized.getContext("2d").drawImage(existingOverlay, 0, 0, viewport.width, viewport.height);
+
+        pageStates[currentPage - 1] = {
+          pdfCanvas,
+          overlayCanvas: resized,
+          width: viewport.width,
+          height: viewport.height
+        };
+      }
+
+      const wrap = document.createElement("div");
+      wrap.className = "page-canvas-wrap";
+      wrap.style.width = viewport.width + "px";
+      wrap.style.height = viewport.height + "px";
+
+      wrap.appendChild(pdfCanvas);
+      wrap.appendChild(drawCanvas);
+
+      pageFrame.innerHTML = "";
+      pageFrame.appendChild(wrap);
+
+      const overlayCtx = drawCanvas.getContext("2d");
+      overlayCtx.drawImage(pageStates[currentPage - 1].overlayCanvas, 0, 0);
+
+      const drawingTools = setupDrawing(drawCanvas);
+
+      const originalMoveHandler = drawCanvas.onmousemove;
+      drawCanvas.addEventListener("pointerup", persistOverlay);
+      drawCanvas.addEventListener("mouseup", persistOverlay);
+      drawCanvas.addEventListener("touchend", persistOverlay, { passive: false });
+      drawCanvas.addEventListener("touchcancel", persistOverlay, { passive: false });
+
+      function persistOverlay() {
+        const targetState = pageStates[currentPage - 1];
+        if (!targetState) return;
+        const ctx = targetState.overlayCanvas.getContext("2d");
+        ctx.clearRect(0, 0, targetState.overlayCanvas.width, targetState.overlayCanvas.height);
+        ctx.drawImage(drawCanvas, 0, 0);
+      }
+
+      drawCanvas.addEventListener("mouseleave", persistOverlay);
+
+      updatePageIndicator();
     }
 
-    async function submitSigned() {
+    async function loadPdf(fileUrl) {
+      const loadingTask = pdfjsLib.getDocument(fileUrl);
+      pdfDoc = await loadingTask.promise;
+      currentPage = 1;
+      pageStates = new Array(pdfDoc.numPages).fill(null);
+      await renderCurrentPage();
+    }
+
+    async function goPrev() {
+      if (!pdfDoc || currentPage <= 1) return;
+      currentPage--;
+      await renderCurrentPage();
+    }
+
+    async function goNext() {
+      if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
+      currentPage++;
+      await renderCurrentPage();
+    }
+
+    async function submitSignedDocument() {
       try {
         clearMsg();
-        await syncSessionBeforeSign();
+        await syncSessionForSign();
 
-        const overlays = buildOverlays();
+        const overlays = buildOverlaysPayload();
 
         const res = await fetch(`/api/sign?screen=${screen}`, {
           method: "POST",
@@ -513,65 +880,114 @@
         });
 
         const data = await res.json();
+
         if (!res.ok || !data.success) {
-          throw new Error(data.error || "Signieren fehlgeschlagen.");
+          throw new Error(data.error || "Dokument konnte nicht bestätigt werden.");
         }
 
         setMsg("Dokument wurde erfolgreich bestätigt.", "ok");
-        setTimeout(showStandby, 1200);
-      } catch (err) {
-        setMsg(err.message || "Fehler beim Bestätigen.", "err");
+        setTimeout(() => {
+          showStandby();
+        }, 1200);
+      } catch (error) {
+        setMsg(error.message || "Fehler beim Bestätigen.", "err");
       }
     }
 
     async function closeDocument() {
       try {
         clearMsg();
-        const res = await fetch(`/api/close?screen=${screen}`, { method: "POST" });
+
+        const res = await fetch(`/api/close?screen=${screen}`, {
+          method: "POST"
+        });
+
         const data = await res.json();
+
         if (!res.ok || !data.success) {
           throw new Error(data.error || "Dokument konnte nicht geschlossen werden.");
         }
+
         showStandby();
-      } catch (err) {
-        setMsg(err.message || "Fehler beim Schließen.", "err");
+      } catch (error) {
+        setMsg(error.message || "Fehler beim Schließen.", "err");
       }
     }
 
-    async function poll() {
+    async function pollDocument() {
       try {
-        const res = await fetch(`/api/document?screen=${screen}`, { cache: "no-store" });
+        const res = await fetch(`/api/document?screen=${screen}`, {
+          cache: "no-store"
+        });
+
         const data = await res.json();
 
         if (data.status !== "ok" || !data.file) {
-          if (currentDocVersion !== null) {
+          if (currentPdfUrl !== null) {
             showStandby();
           }
           return;
         }
 
-        if (currentDocVersion !== data.version || currentDocFile !== data.file) {
-          currentDocVersion = data.version;
-          currentDocFile = data.file;
+        if (currentPdfUrl !== data.file || currentVersion !== data.version) {
+          currentPdfUrl = data.file;
+          currentVersion = data.version;
+
           showLive();
           applyMode(data.mode, data.session || null);
-          await renderPdf(`${data.file}?v=${data.version}`);
+          await loadPdf(`${data.file}?v=${data.version}`);
+        } else if (currentMode !== data.mode) {
+          applyMode(data.mode, data.session || null);
         }
-      } catch (err) {
-        console.error(err);
+      } catch (error) {
+        console.error(error);
       }
     }
 
-    document.getElementById("submitBtn").addEventListener("click", submitSigned);
-    document.getElementById("closeDocBtn").addEventListener("click", closeDocument);
-    document.getElementById("clearAllBtn").addEventListener("click", () => {
-      pageLayers.forEach(layer => layer.clear());
-      clearMsg();
+    document.getElementById("clearPageBtn").addEventListener("click", clearCurrentPage);
+    document.getElementById("submitBtn").addEventListener("click", submitSignedDocument);
+    document.getElementById("closeBtn").addEventListener("click", closeDocument);
+    prevBtn.addEventListener("click", goPrev);
+    nextBtn.addEventListener("click", goNext);
+
+    let touchStartX = null;
+    let touchStartY = null;
+
+    pageFrame.addEventListener("touchstart", (e) => {
+      if (!e.touches || !e.touches[0]) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    pageFrame.addEventListener("touchend", async (e) => {
+      if (touchStartX === null || touchStartY === null) return;
+      const touch = e.changedTouches && e.changedTouches[0];
+      if (!touch) return;
+
+      const dx = touch.clientX - touchStartX;
+      const dy = touch.clientY - touchStartY;
+
+      touchStartX = null;
+      touchStartY = null;
+
+      if (Math.abs(dx) > 90 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        if (dx < 0) {
+          await goNext();
+        } else {
+          await goPrev();
+        }
+      }
+    }, { passive: true });
+
+    window.addEventListener("resize", () => {
+      if (pdfDoc) {
+        renderCurrentPage().catch(console.error);
+      }
     });
 
     showStandby();
-    poll();
-    pollTimer = setInterval(poll, 2000);
+    pollDocument();
+    pollTimer = setInterval(pollDocument, 2000);
   </script>
 </body>
 </html>
