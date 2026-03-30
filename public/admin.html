@@ -71,7 +71,7 @@
 
     .grid {
       display: grid;
-      grid-template-columns: 360px 1fr;
+      grid-template-columns: 380px 1fr;
       gap: 22px;
     }
 
@@ -161,7 +161,7 @@
     input, select, textarea {
       width: 100%;
       border: 1px solid rgba(255,255,255,0.10);
-      background: rgba(255,255,255,0.04);
+      background: rgba(255,255,255,0.06);
       color: #f8fafc;
       border-radius: 16px;
       padding: 14px 14px;
@@ -172,6 +172,22 @@
     textarea {
       min-height: 110px;
       resize: vertical;
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+      color: #94a3b8;
+    }
+
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+    }
+
+    select option {
+      color: #111827;
+      background: #ffffff;
     }
 
     input:focus, select:focus, textarea:focus {
@@ -187,8 +203,12 @@
       background: rgba(255,255,255,0.03);
     }
 
-    .upload-box input {
+    .upload-box input[type="file"] {
       margin-top: 10px;
+      color: #f8fafc;
+      background: transparent;
+      border: none;
+      padding: 8px 0 0;
     }
 
     .buttons {
@@ -208,6 +228,12 @@
 
     button:hover {
       transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
     }
 
     .primary {
@@ -232,6 +258,15 @@
       color: #cbd5e1;
       font-size: 14px;
       font-weight: 600;
+      line-height: 1.5;
+    }
+
+    .ok {
+      color: #86efac !important;
+    }
+
+    .err {
+      color: #fca5a5 !important;
     }
 
     .mode-panel {
@@ -246,6 +281,12 @@
     .notification-permission {
       font-size: 13px;
       color: #94a3b8;
+    }
+
+    .file-info {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #cbd5e1;
     }
 
     @media (max-width: 980px) {
@@ -348,6 +389,7 @@
           <div class="upload-box">
             <div><strong>PDF auswählen</strong></div>
             <input type="file" id="pdfFile" accept="application/pdf">
+            <div id="fileInfo" class="file-info">Keine Datei ausgewählt.</div>
           </div>
 
           <div style="height:16px;"></div>
@@ -381,6 +423,11 @@
     const statusBadge = document.getElementById("statusBadge");
     const statusLines = document.getElementById("statusLines");
     const notificationInfo = document.getElementById("notificationInfo");
+    const fileInput = document.getElementById("pdfFile");
+    const fileInfo = document.getElementById("fileInfo");
+    const saveBtn = document.getElementById("saveBtn");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const closeBtn = document.getElementById("closeBtn");
 
     let lastNotifiedAt = localStorage.getItem("lastSignedAt") || null;
 
@@ -395,15 +442,25 @@
       if (value === "mode3") mode3Panel.classList.add("visible");
     }
 
+    function setMessage(text, isError = false) {
+      msg.textContent = text;
+      msg.className = isError ? "err" : "ok";
+    }
+
     mode.addEventListener("change", setModePanels);
     setModePanels();
 
-    function setMessage(text, isError = false) {
-      msg.textContent = text;
-      msg.style.color = isError ? "#fca5a5" : "#cbd5e1";
-    }
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      fileInfo.textContent = file
+        ? `Ausgewählt: ${file.name}`
+        : "Keine Datei ausgewählt.";
+    });
 
     async function saveSession() {
+      saveBtn.disabled = true;
+      setMessage("Speichere...");
+
       let payload = { mode: mode.value };
 
       if (mode.value === "mode1") {
@@ -417,58 +474,87 @@
         payload.reason = document.getElementById("reason3").value.trim();
       }
 
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      try {
+        const res = await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
 
-      const data = await res.json();
+        const data = await res.json();
 
-      if (data.success) {
-        setMessage("Daten gespeichert.");
-      } else {
-        setMessage(data.error || "Fehler beim Speichern.", true);
+        if (data.success) {
+          setMessage("Daten gespeichert.");
+          await loadStatus();
+        } else {
+          setMessage(data.error || "Fehler beim Speichern.", true);
+        }
+      } catch (err) {
+        setMessage("Fehler beim Speichern: " + err.message, true);
+      } finally {
+        saveBtn.disabled = false;
       }
     }
 
     async function uploadPdf() {
-      const file = document.getElementById("pdfFile").files[0];
+      const file = fileInput.files[0];
       if (!file) {
         setMessage("Bitte zuerst eine PDF auswählen.", true);
         return;
       }
 
+      uploadBtn.disabled = true;
+      setMessage("PDF wird hochgeladen...");
+
       const formData = new FormData();
       formData.append("pdf", file);
 
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData
-      });
+      try {
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData
+        });
 
-      const data = await res.json();
+        const data = await res.json();
 
-      if (data.success) {
-        setMessage("PDF erfolgreich hochgeladen.");
-        document.getElementById("previewFrame").src = "/";
-      } else {
-        setMessage(data.error || "Fehler beim Hochladen.", true);
+        if (data.success) {
+          setMessage("PDF erfolgreich hochgeladen.");
+          fileInput.value = "";
+          fileInfo.textContent = "Keine Datei ausgewählt.";
+          document.getElementById("previewFrame").src = "/";
+          await loadStatus();
+        } else {
+          setMessage(data.error || "Fehler beim Hochladen.", true);
+        }
+      } catch (err) {
+        setMessage("Upload fehlgeschlagen: " + err.message, true);
+      } finally {
+        uploadBtn.disabled = false;
       }
     }
 
     async function closePdf() {
-      const res = await fetch("/api/close", {
-        method: "POST"
-      });
+      closeBtn.disabled = true;
+      setMessage("Schließe PDF...");
 
-      const data = await res.json();
+      try {
+        const res = await fetch("/api/close", {
+          method: "POST"
+        });
 
-      if (data.success) {
-        setMessage("Standby wurde aktiviert.");
-        document.getElementById("previewFrame").src = "/";
-      } else {
-        setMessage(data.error || "Fehler beim Schließen.", true);
+        const data = await res.json();
+
+        if (data.success) {
+          setMessage("Standby wurde aktiviert.");
+          document.getElementById("previewFrame").src = "/";
+          await loadStatus();
+        } else {
+          setMessage(data.error || "Fehler beim Schließen.", true);
+        }
+      } catch (err) {
+        setMessage("Fehler beim Schließen: " + err.message, true);
+      } finally {
+        closeBtn.disabled = false;
       }
     }
 
