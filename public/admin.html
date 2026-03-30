@@ -8,7 +8,6 @@
     :root{
       --bg:#0f172a;
       --panel:#111827;
-      --panel-2:#1f2937;
       --line:#334155;
       --text:#e5e7eb;
       --muted:#94a3b8;
@@ -59,7 +58,7 @@
 
     .grid{
       display:grid;
-      grid-template-columns: 400px 1fr;
+      grid-template-columns:400px 1fr;
       gap:20px;
     }
 
@@ -71,7 +70,7 @@
       box-shadow:0 10px 25px rgba(0,0,0,.22);
     }
 
-    .card h2,.card h3{
+    .card h2{
       margin-top:0;
     }
 
@@ -221,7 +220,7 @@
       min-height:74vh;
       border:none;
       border-radius:14px;
-      background:#0b1220;
+      background:#000;
     }
 
     .msg{
@@ -255,7 +254,7 @@
       display:inline-block;
     }
 
-    @media (max-width: 1100px){
+    @media (max-width:1100px){
       .grid{grid-template-columns:1fr}
       .preview-frame{min-height:65vh}
       .info-grid{grid-template-columns:1fr}
@@ -267,10 +266,9 @@
     <div class="topbar">
       <div>
         <h1>Admin Panel</h1>
-        <div class="muted">3 Optionen wie bisher – mit Auswahl für Screen 1 / Screen 2 und Live-Kiosk-Vorschau</div>
+        <div class="muted">PDF auswählen und direkt hochladen</div>
       </div>
       <div class="top-actions">
-        <button class="secondary" id="openSelectBtn">Screen-Auswahl öffnen</button>
         <button class="secondary" id="openKioskBtn">Aktuellen Kiosk öffnen</button>
         <button class="danger" id="logoutBtn">Logout</button>
       </div>
@@ -325,7 +323,7 @@
 
         <div id="formMode2" class="hidden">
           <div class="msg show ok" style="display:block">
-            Bei Option 2 wird das Dokument nur angezeigt. Es sind keine zusätzlichen Daten notwendig.
+            Bei Option 2 wird das Dokument nur angezeigt.
           </div>
         </div>
 
@@ -333,8 +331,7 @@
         <input id="file" type="file" accept="application/pdf" />
 
         <div class="actions">
-          <button class="success" id="saveAndUploadBtn">Daten speichern + PDF hochladen</button>
-          <button class="secondary" id="saveOnlyBtn">Nur Daten speichern</button>
+          <button class="success" id="uploadBtn">Hochladen</button>
           <button class="danger" id="closeBtn">Aktive PDF schließen</button>
         </div>
 
@@ -386,17 +383,12 @@
 
           <div class="link-row" style="margin-top:14px">
             <a id="kioskLink" href="/kiosk.html?screen=1" target="_blank">Kiosk für diesen Screen öffnen</a>
-            <a href="/kiosk" target="_blank">Zur Screen-Auswahl</a>
           </div>
         </div>
 
         <div class="card">
           <h2>Live-Kiosk-Vorschau</h2>
-          <iframe
-            id="preview"
-            class="preview-frame"
-            src="/kiosk.html?screen=1"
-          ></iframe>
+          <iframe id="preview" class="preview-frame" src="/kiosk.html?screen=1"></iframe>
         </div>
       </div>
     </div>
@@ -550,7 +542,6 @@
 
     async function loadStatus() {
       clearMessage();
-
       document.getElementById("infoScreen").textContent = `Screen ${currentScreen()}`;
       refreshPreview();
 
@@ -580,18 +571,7 @@
         : "-";
     }
 
-    async function saveOnly() {
-      try {
-        clearMessage();
-        await saveSession();
-        await loadStatus();
-        setMessage("Daten wurden gespeichert.", "ok");
-      } catch (err) {
-        setMessage(err.message || "Fehler beim Speichern.", "err");
-      }
-    }
-
-    async function saveAndUpload() {
+    async function uploadAll() {
       try {
         clearMessage();
         await saveSession();
@@ -599,9 +579,9 @@
         document.getElementById("file").value = "";
         await loadStatus();
         refreshPreview();
-        setMessage("Daten gespeichert und PDF hochgeladen.", "ok");
+        setMessage("PDF wurde erfolgreich hochgeladen.", "ok");
       } catch (err) {
-        setMessage(err.message || "Fehler beim Speichern oder Hochladen.", "err");
+        setMessage(err.message || "Fehler beim Hochladen.", "err");
       }
     }
 
@@ -632,14 +612,9 @@
       window.location.href = "/admin";
     }
 
-    document.getElementById("saveAndUploadBtn").addEventListener("click", saveAndUpload);
-    document.getElementById("saveOnlyBtn").addEventListener("click", saveOnly);
+    document.getElementById("uploadBtn").addEventListener("click", uploadAll);
     document.getElementById("closeBtn").addEventListener("click", closePdf);
     document.getElementById("logoutBtn").addEventListener("click", logout);
-
-    document.getElementById("openSelectBtn").addEventListener("click", () => {
-      window.open("/kiosk", "_blank");
-    });
 
     document.getElementById("openKioskBtn").addEventListener("click", () => {
       window.open(`/kiosk.html?screen=${currentScreen()}`, "_blank");
