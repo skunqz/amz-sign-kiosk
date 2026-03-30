@@ -1,60 +1,304 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
-<meta charset="UTF-8">
-<title>Kiosk</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Kiosk</title>
 
-<style>
-body {
-  margin:0;
-  background:black;
-  color:white;
-  text-align:center;
-}
+  <style>
+    * {
+      box-sizing: border-box;
+    }
 
-iframe {
-  width:100%;
-  height:90vh;
-  border:none;
-}
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+      background: #000;
+      color: white;
+    }
 
-button {
-  width:100%;
-  height:10vh;
-  font-size:20px;
-  border:none;
-  background:#22c55e;
-  color:white;
-}
-</style>
+    .app {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .screen {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .screen.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .standby {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #555;
+      z-index: 1;
+    }
+
+    .standby img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .active {
+      display: grid;
+      grid-template-rows: 90px 1fr 90px;
+      background: #000;
+      z-index: 2;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      background: rgba(0, 0, 0, 0.92);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .title {
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #cbd5e1;
+      margin-top: 4px;
+    }
+
+    .screen-badge {
+      font-size: 16px;
+      font-weight: 700;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+    }
+
+    .pdf-wrap {
+      width: 100%;
+      height: 100%;
+      background: #000;
+    }
+
+    .pdf-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: white;
+    }
+
+    .button-bar {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.96);
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .action-btn {
+      width: 100%;
+      height: 60px;
+      border: none;
+      border-radius: 16px;
+      font-size: 22px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #22c55e;
+      color: white;
+    }
+
+    .action-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .success-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.78);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .success-overlay.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .success-card {
+      min-width: 340px;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px;
+      padding: 30px;
+      text-align: center;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+    }
+
+    .success-card h2 {
+      margin: 0 0 8px;
+      font-size: 30px;
+    }
+
+    .success-card p {
+      margin: 0;
+      color: #cbd5e1;
+      font-size: 16px;
+    }
+  </style>
 </head>
-
 <body>
+  <div class="app">
+    <div id="standbyScreen" class="screen standby visible">
+      <img src="/logo-portrait.png" alt="Logo">
+    </div>
 
-<iframe id="pdf"></iframe>
-<button onclick="closePdf()">Schließen</button>
+    <div id="activeScreen" class="screen active">
+      <div class="topbar">
+        <div>
+          <div class="title">Dokument anzeigen</div>
+          <div class="subtitle">Bitte prüfen Sie das Dokument</div>
+        </div>
+        <div id="screenBadge" class="screen-badge">Screen 1</div>
+      </div>
 
-<script>
-const params = new URLSearchParams(window.location.search);
-const screen = params.get("screen") || "1";
+      <div class="pdf-wrap">
+        <iframe id="pdfFrame" class="pdf-frame"></iframe>
+      </div>
 
-async function load() {
-  const res = await fetch(`/api/document?screen=${screen}`);
-  const data = await res.json();
+      <div class="button-bar">
+        <button id="closeBtn" class="action-btn">Schließen</button>
+      </div>
+    </div>
 
-  if (data.status === "ok") {
-    document.getElementById("pdf").src = data.file;
-  }
-}
+    <div id="successOverlay" class="success-overlay">
+      <div class="success-card">
+        <h2>Geschlossen</h2>
+        <p>Der Standby-Screen wird geladen</p>
+      </div>
+    </div>
+  </div>
 
-async function closePdf(){
-  await fetch(`/api/close?screen=${screen}`, { method:"POST" });
-  location.reload();
-}
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const screen = params.get("screen") === "2" ? "2" : "1";
 
-setInterval(load, 2000);
-load();
-</script>
+    const standbyScreen = document.getElementById("standbyScreen");
+    const activeScreen = document.getElementById("activeScreen");
+    const pdfFrame = document.getElementById("pdfFrame");
+    const closeBtn = document.getElementById("closeBtn");
+    const successOverlay = document.getElementById("successOverlay");
+    const screenBadge = document.getElementById("screenBadge");
 
+    screenBadge.textContent = screen === "2" ? "Screen 2" : "Screen 1";
+
+    let currentFile = null;
+    let isClosing = false;
+
+    function showStandby() {
+      standbyScreen.classList.add("visible");
+      activeScreen.classList.remove("visible");
+      pdfFrame.src = "";
+      currentFile = null;
+    }
+
+    function showPdf(fileUrl) {
+      standbyScreen.classList.remove("visible");
+      activeScreen.classList.add("visible");
+
+      if (currentFile !== fileUrl) {
+        pdfFrame.src = fileUrl;
+        currentFile = fileUrl;
+      }
+    }
+
+    function showSuccess() {
+      successOverlay.classList.add("visible");
+    }
+
+    function hideSuccess() {
+      successOverlay.classList.remove("visible");
+    }
+
+    async function loadDocument() {
+      if (isClosing) return;
+
+      try {
+        const res = await fetch(`/api/document?screen=${screen}&_=${Date.now()}`, {
+          cache: "no-store"
+        });
+        const data = await res.json();
+
+        if (data.status === "ok" && data.file) {
+          showPdf(data.file);
+        } else {
+          showStandby();
+        }
+      } catch (err) {
+        showStandby();
+      }
+    }
+
+    async function closePdf() {
+      if (isClosing) return;
+
+      isClosing = true;
+      closeBtn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/close?screen=${screen}`, {
+          method: "POST"
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showSuccess();
+
+          setTimeout(() => {
+            hideSuccess();
+            showStandby();
+            closeBtn.disabled = false;
+            isClosing = false;
+          }, 1200);
+        } else {
+          closeBtn.disabled = false;
+          isClosing = false;
+          alert(data.error || "Fehler beim Schließen");
+        }
+      } catch (err) {
+        closeBtn.disabled = false;
+        isClosing = false;
+        alert("Fehler beim Schließen");
+      }
+    }
+
+    closeBtn.addEventListener("click", closePdf);
+
+    loadDocument();
+    setInterval(loadDocument, 2500);
+  </script>
 </body>
 </html>
