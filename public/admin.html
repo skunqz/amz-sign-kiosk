@@ -16,20 +16,23 @@
       --accent-2:#2563eb;
       --danger:#dc2626;
       --success:#16a34a;
-      --warning:#f59e0b;
     }
+
     *{box-sizing:border-box}
+
     body{
       margin:0;
       font-family:Arial, Helvetica, sans-serif;
       background:linear-gradient(180deg,#0b1220 0%, #0f172a 100%);
       color:var(--text);
     }
+
     .wrap{
-      max-width:1200px;
+      max-width:1400px;
       margin:0 auto;
       padding:24px;
     }
+
     .topbar{
       display:flex;
       justify-content:space-between;
@@ -38,37 +41,47 @@
       margin-bottom:20px;
       flex-wrap:wrap;
     }
+
     h1{
       margin:0;
       font-size:28px;
     }
-    .muted{color:var(--muted)}
+
+    .muted{
+      color:var(--muted);
+    }
+
     .top-actions{
       display:flex;
       gap:10px;
       flex-wrap:wrap;
     }
+
     .grid{
       display:grid;
-      grid-template-columns: 380px 1fr;
+      grid-template-columns: 400px 1fr;
       gap:20px;
     }
+
     .card{
-      background:rgba(17,24,39,.95);
+      background:rgba(17,24,39,.96);
       border:1px solid var(--line);
       border-radius:18px;
       padding:18px;
       box-shadow:0 10px 25px rgba(0,0,0,.22);
     }
+
     .card h2,.card h3{
       margin-top:0;
     }
+
     label{
       display:block;
       font-size:14px;
       color:var(--muted);
       margin:14px 0 6px;
     }
+
     input, select, textarea, button{
       width:100%;
       border-radius:12px;
@@ -78,67 +91,79 @@
       padding:12px 14px;
       font-size:15px;
     }
+
     textarea{
       resize:vertical;
       min-height:96px;
     }
+
     button{
       cursor:pointer;
       background:var(--accent);
       border-color:var(--accent);
       font-weight:700;
     }
-    button:hover{background:var(--accent-2)}
+
+    button:hover{
+      background:var(--accent-2);
+    }
+
     button.secondary{
       background:#1e293b;
       border-color:#475569;
     }
+
     button.secondary:hover{
       background:#243244;
     }
+
     button.danger{
       background:var(--danger);
       border-color:var(--danger);
     }
+
     button.success{
       background:var(--success);
       border-color:var(--success);
     }
-    .row{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:10px;
-    }
+
     .mode-grid{
       display:grid;
       gap:10px;
       margin-top:10px;
     }
+
     .mode-card{
       border:1px solid var(--line);
       border-radius:14px;
       padding:12px;
       background:#0b1220;
       cursor:pointer;
+      transition:.15s ease;
     }
+
     .mode-card.active{
       border-color:var(--accent);
-      outline:2px solid rgba(59,130,246,.25);
+      outline:2px solid rgba(59,130,246,.22);
       background:#101a2d;
     }
+
     .mode-card strong{
       display:block;
       margin-bottom:4px;
     }
+
     .mode-card span{
       color:var(--muted);
       font-size:14px;
     }
+
     .status-box{
       display:grid;
       gap:10px;
       margin-top:10px;
     }
+
     .pill{
       display:inline-flex;
       align-items:center;
@@ -150,46 +175,55 @@
       background:#0b1220;
       width:max-content;
     }
+
     .dot{
       width:10px;
       height:10px;
       border-radius:50%;
       background:#64748b;
     }
+
     .dot.live{background:var(--success)}
     .dot.off{background:var(--danger)}
+
     .actions{
       display:grid;
       gap:10px;
       margin-top:16px;
     }
+
     .preview-wrap{
       display:grid;
       gap:14px;
     }
+
     .info-grid{
       display:grid;
       grid-template-columns:repeat(2,minmax(0,1fr));
       gap:10px;
     }
+
     .info{
       background:#0b1220;
       border:1px solid var(--line);
       border-radius:14px;
       padding:12px;
     }
+
     .info small{
       display:block;
       color:var(--muted);
       margin-bottom:6px;
     }
+
     .preview-frame{
       width:100%;
-      min-height:70vh;
+      min-height:74vh;
       border:none;
       border-radius:14px;
-      background:white;
+      background:#0b1220;
     }
+
     .msg{
       margin-top:12px;
       padding:12px 14px;
@@ -198,15 +232,19 @@
       font-size:14px;
       line-height:1.4;
     }
+
     .msg.show{display:block}
     .msg.ok{background:rgba(22,163,74,.15); border:1px solid rgba(22,163,74,.4)}
     .msg.err{background:rgba(220,38,38,.15); border:1px solid rgba(220,38,38,.4)}
+
     .hidden{display:none !important}
+
     .link-row{
       display:flex;
       gap:10px;
       flex-wrap:wrap;
     }
+
     .link-row a{
       color:white;
       text-decoration:none;
@@ -216,10 +254,11 @@
       border-radius:12px;
       display:inline-block;
     }
-    @media (max-width: 980px){
+
+    @media (max-width: 1100px){
       .grid{grid-template-columns:1fr}
-      .preview-frame{min-height:55vh}
-      .row,.info-grid{grid-template-columns:1fr}
+      .preview-frame{min-height:65vh}
+      .info-grid{grid-template-columns:1fr}
     }
   </style>
 </head>
@@ -228,7 +267,7 @@
     <div class="topbar">
       <div>
         <h1>Admin Panel</h1>
-        <div class="muted">Wie früher mit 3 Optionen — plus Auswahl für Screen 1 / Screen 2</div>
+        <div class="muted">3 Optionen wie bisher – mit Auswahl für Screen 1 / Screen 2 und Live-Kiosk-Vorschau</div>
       </div>
       <div class="top-actions">
         <button class="secondary" id="openSelectBtn">Screen-Auswahl öffnen</button>
@@ -318,22 +357,27 @@
               <small>Aktiver Screen</small>
               <div id="infoScreen">Screen 1</div>
             </div>
+
             <div class="info">
               <small>Aktive Option</small>
               <div id="infoMode">-</div>
             </div>
+
             <div class="info">
               <small>Aktive Datei</small>
               <div id="infoFile">-</div>
             </div>
+
             <div class="info">
               <small>Name</small>
               <div id="infoName">-</div>
             </div>
+
             <div class="info">
               <small>Zuletzt unterschrieben von</small>
               <div id="infoLastSignedName">-</div>
             </div>
+
             <div class="info">
               <small>Zuletzt unterschrieben am</small>
               <div id="infoLastSignedAt">-</div>
@@ -347,8 +391,12 @@
         </div>
 
         <div class="card">
-          <h2>PDF Vorschau</h2>
-          <iframe id="preview" class="preview-frame"></iframe>
+          <h2>Live-Kiosk-Vorschau</h2>
+          <iframe
+            id="preview"
+            class="preview-frame"
+            src="/kiosk.html?screen=1"
+          ></iframe>
         </div>
       </div>
     </div>
@@ -394,9 +442,11 @@
 
     function applyMode(mode) {
       selectedMode = mode;
+
       modeCards.forEach(card => {
         card.classList.toggle("active", card.dataset.mode === mode);
       });
+
       formMode1.classList.toggle("hidden", mode !== "mode1");
       formMode2.classList.toggle("hidden", mode !== "mode2");
       formMode3.classList.toggle("hidden", mode !== "mode3");
@@ -429,7 +479,14 @@
 
     function fillSession(session) {
       if (!session) return;
+
       applyMode(session.mode || "mode1");
+
+      document.getElementById("name").value = "";
+      document.getElementById("email").value = "";
+      document.getElementById("phone").value = "";
+      document.getElementById("name3").value = "";
+      document.getElementById("reason").value = "";
 
       if (session.mode === "mode1") {
         document.getElementById("name").value = session.name || "";
@@ -453,14 +510,17 @@
       });
 
       const data = await res.json();
+
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Session konnte nicht gespeichert werden.");
       }
+
       return data;
     }
 
     async function uploadPdf() {
       const file = document.getElementById("file").files[0];
+
       if (!file) {
         throw new Error("Bitte zuerst eine PDF auswählen.");
       }
@@ -474,22 +534,29 @@
       });
 
       const data = await res.json();
+
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Upload fehlgeschlagen.");
       }
+
       return data;
+    }
+
+    function refreshPreview() {
+      const screen = currentScreen();
+      preview.src = `/kiosk.html?screen=${screen}&t=${Date.now()}`;
+      document.getElementById("kioskLink").href = `/kiosk.html?screen=${screen}`;
     }
 
     async function loadStatus() {
       clearMessage();
 
       document.getElementById("infoScreen").textContent = `Screen ${currentScreen()}`;
-      document.getElementById("kioskLink").href = `/kiosk.html?screen=${currentScreen()}`;
+      refreshPreview();
 
-      const [statusRes, sessionRes, docRes] = await Promise.all([
+      const [statusRes, sessionRes] = await Promise.all([
         fetch(`/api/status?screen=${currentScreen()}`),
-        fetch(`/api/session?screen=${currentScreen()}`),
-        fetch(`/api/document?screen=${currentScreen()}`)
+        fetch(`/api/session?screen=${currentScreen()}`)
       ]);
 
       if (statusRes.status === 401 || sessionRes.status === 401) {
@@ -499,7 +566,6 @@
 
       const status = await statusRes.json();
       const sessionData = await sessionRes.json();
-      const doc = await docRes.json();
 
       fillSession(sessionData.session || null);
 
@@ -512,12 +578,6 @@
       document.getElementById("infoLastSignedAt").textContent = status.lastSignedAt
         ? new Date(status.lastSignedAt).toLocaleString("de-DE")
         : "-";
-
-      if (doc.status === "ok" && doc.file) {
-        preview.src = doc.file;
-      } else {
-        preview.src = "";
-      }
     }
 
     async function saveOnly() {
@@ -538,6 +598,7 @@
         await uploadPdf();
         document.getElementById("file").value = "";
         await loadStatus();
+        refreshPreview();
         setMessage("Daten gespeichert und PDF hochgeladen.", "ok");
       } catch (err) {
         setMessage(err.message || "Fehler beim Speichern oder Hochladen.", "err");
@@ -547,12 +608,19 @@
     async function closePdf() {
       try {
         clearMessage();
-        const res = await fetch(`/api/close?screen=${currentScreen()}`, { method: "POST" });
+
+        const res = await fetch(`/api/close?screen=${currentScreen()}`, {
+          method: "POST"
+        });
+
         const data = await res.json();
+
         if (!res.ok || !data.success) {
           throw new Error(data.error || "PDF konnte nicht geschlossen werden.");
         }
+
         await loadStatus();
+        refreshPreview();
         setMessage("PDF wurde geschlossen.", "ok");
       } catch (err) {
         setMessage(err.message || "Fehler beim Schließen.", "err");
@@ -577,11 +645,14 @@
       window.open(`/kiosk.html?screen=${currentScreen()}`, "_blank");
     });
 
-    screenSelect.addEventListener("change", loadStatus);
+    screenSelect.addEventListener("change", async () => {
+      await loadStatus();
+    });
 
     screenSelect.value = getQueryScreen();
     applyMode("mode1");
     loadStatus();
+    setInterval(loadStatus, 3000);
   </script>
 </body>
 </html>
