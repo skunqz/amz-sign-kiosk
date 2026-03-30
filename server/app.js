@@ -351,10 +351,24 @@ function buildMailContent(session, currentPdf, screen, dropboxPath = null) {
 }
 
 function sanitizeFilePart(value, fallback = "unbekannt") {
-  const cleaned = String(value || "")
-    .trim()
-    .replace(/[^\p{L}\p{N}\-_ ]/gu, "")
-    .replace(/\s+/g, "_");
+  let cleaned = String(value || "").trim();
+
+  cleaned = cleaned
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/Ä/g, "Ae")
+    .replace(/Ö/g, "Oe")
+    .replace(/Ü/g, "Ue")
+    .replace(/ß/g, "ss");
+
+  cleaned = cleaned
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9\-_ ]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
 
   return cleaned || fallback;
 }
