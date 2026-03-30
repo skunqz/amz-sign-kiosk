@@ -2,31 +2,38 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Kiosk</title>
+
   <style>
     :root{
-      --bg:#0b1220;
-      --panel:#111827;
-      --line:#334155;
-      --text:#e5e7eb;
-      --muted:#94a3b8;
+      --bg:#000000;
+      --panel:#0b0b0b;
+      --line:#1f2937;
+      --text:#ffffff;
+      --muted:#9ca3af;
       --accent:#2563eb;
       --accent-dark:#1d4ed8;
       --danger:#dc2626;
+      --danger-dark:#b91c1c;
+      --secondary:#374151;
+      --secondary-dark:#1f2937;
       --success:#16a34a;
     }
 
-    *{ box-sizing:border-box; }
+    *{
+      box-sizing:border-box;
+      -webkit-tap-highlight-color:transparent;
+    }
 
     html, body{
       margin:0;
       width:100%;
       height:100%;
-      font-family:Arial, Helvetica, sans-serif;
-      background:var(--bg);
-      color:var(--text);
       overflow:hidden;
+      background:#000;
+      color:var(--text);
+      font-family:Arial, Helvetica, sans-serif;
       touch-action:manipulation;
     }
 
@@ -43,34 +50,41 @@
       justify-content:space-between;
       gap:16px;
       padding:14px 18px;
-      background:rgba(15,23,42,.96);
-      border-bottom:1px solid var(--line);
+      background:#000;
+      border-bottom:1px solid #111827;
+      z-index:30;
     }
 
     .topbar-left{
+      min-width:0;
       display:flex;
       flex-direction:column;
       gap:4px;
-      min-width:0;
     }
 
     .title{
       font-size:24px;
-      font-weight:700;
+      font-weight:800;
+      line-height:1.1;
     }
 
     .subtitle{
       color:var(--muted);
       font-size:15px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
 
     .screen-badge{
+      flex:0 0 auto;
       padding:10px 14px;
       border-radius:999px;
-      border:1px solid #475569;
-      background:#1e293b;
+      background:#111827;
+      border:1px solid #1f2937;
       font-size:15px;
-      white-space:nowrap;
+      font-weight:700;
+      color:#fff;
     }
 
     .main{
@@ -78,78 +92,61 @@
       min-height:0;
       position:relative;
       overflow:hidden;
+      background:#000;
+    }
+
+    .hidden{
+      display:none !important;
     }
 
     /* STANDBY */
     .standby{
       position:absolute;
       inset:0;
+      background:#000;
       display:flex;
       align-items:center;
       justify-content:center;
-      padding:24px;
-      background:
-        radial-gradient(circle at top, rgba(37,99,235,.18), transparent 35%),
-        linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
+      overflow:hidden;
     }
 
     .standby-card{
-      width:min(760px, 92vw);
-      min-height:70vh;
-      border-radius:28px;
-      border:1px solid var(--line);
-      background:rgba(17,24,39,.92);
-      box-shadow:0 20px 60px rgba(0,0,0,.35);
+      width:100%;
+      height:100%;
+      background:#000;
       display:flex;
-      flex-direction:column;
       align-items:center;
       justify-content:center;
-      text-align:center;
-      padding:40px 28px;
-      gap:22px;
     }
 
     .standby-logo-wrap{
-      width:min(320px, 62vw);
-      height:min(320px, 32vh);
+      width:100%;
+      height:100%;
       display:flex;
       align-items:center;
       justify-content:center;
+      background:#000;
     }
 
     .standby-logo{
-      max-width:100%;
-      max-height:100%;
+      width:100%;
+      height:100%;
       object-fit:contain;
+      background:#000;
       display:block;
     }
 
     .standby-fallback{
-      width:180px;
-      height:180px;
-      border-radius:32px;
+      width:100%;
+      height:100%;
       display:flex;
       align-items:center;
       justify-content:center;
-      font-size:64px;
+      background:#000;
+      color:#fff;
+      font-size:120px;
       font-weight:800;
-      background:#0f172a;
-      border:1px solid var(--line);
-      color:#60a5fa;
-    }
-
-    .standby h1{
-      margin:0;
-      font-size:42px;
-      line-height:1.1;
-    }
-
-    .standby p{
-      margin:0;
-      color:var(--muted);
-      font-size:22px;
-      line-height:1.5;
-      max-width:560px;
+      letter-spacing:2px;
     }
 
     /* LIVE */
@@ -159,59 +156,51 @@
       display:flex;
       flex-direction:column;
       min-height:0;
-      background:#0b1220;
-    }
-
-    .hidden{
-      display:none !important;
-    }
-
-    .content{
-      flex:1 1 auto;
-      min-height:0;
-      display:grid;
-      grid-template-columns: 1fr;
-      overflow:hidden;
+      background:#000;
     }
 
     .doc-stage{
-      position:relative;
-      height:100%;
+      flex:1 1 auto;
       min-height:0;
-      overflow:hidden;
+      position:relative;
       display:flex;
       align-items:center;
       justify-content:center;
-      padding:14px 84px;
+      padding:14px 86px;
+      overflow:hidden;
+      background:#000;
     }
 
     .pdf-shell{
-      position:relative;
       width:100%;
       height:100%;
       display:flex;
       align-items:center;
       justify-content:center;
+      min-height:0;
+      min-width:0;
     }
 
     .page-frame{
-      position:relative;
       width:100%;
       height:100%;
       display:flex;
       align-items:center;
       justify-content:center;
+      position:relative;
+      min-height:0;
+      min-width:0;
     }
 
     .page-canvas-wrap{
       position:relative;
       display:inline-block;
-      background:white;
-      border-radius:18px;
-      overflow:hidden;
-      box-shadow:0 18px 50px rgba(0,0,0,.35);
       max-width:100%;
       max-height:100%;
+      background:#fff;
+      border-radius:20px;
+      overflow:hidden;
+      box-shadow:0 16px 50px rgba(0,0,0,.45);
       touch-action:none;
     }
 
@@ -234,40 +223,25 @@
       background:transparent;
     }
 
-    .page-indicator{
-      position:absolute;
-      top:16px;
-      left:16px;
-      z-index:5;
-      background:rgba(255,255,255,.94);
-      color:#111827;
-      border:1px solid rgba(0,0,0,.08);
-      border-radius:999px;
-      padding:10px 14px;
-      font-weight:700;
-      font-size:15px;
-    }
-
     .nav-btn{
       position:absolute;
       top:50%;
       transform:translateY(-50%);
-      z-index:10;
-      width:72px;
-      height:72px;
+      z-index:20;
+      width:76px;
+      height:76px;
       border:none;
       border-radius:999px;
-      background:rgba(30,41,59,.92);
-      color:white;
-      font-size:34px;
-      font-weight:700;
+      background:rgba(17,24,39,.92);
+      color:#fff;
+      font-size:38px;
+      font-weight:800;
       display:flex;
       align-items:center;
       justify-content:center;
-      box-shadow:0 8px 24px rgba(0,0,0,.3);
+      box-shadow:0 8px 24px rgba(0,0,0,.35);
       cursor:pointer;
       user-select:none;
-      -webkit-user-select:none;
     }
 
     .nav-btn:active{
@@ -277,19 +251,44 @@
     .nav-left{ left:10px; }
     .nav-right{ right:10px; }
 
+    .nav-btn[disabled]{
+      opacity:.3;
+      cursor:default;
+    }
+
     .bottom-panel{
       flex:0 0 auto;
-      border-top:1px solid var(--line);
-      background:rgba(15,23,42,.98);
+      background:#000;
+      border-top:1px solid #111827;
       padding:14px;
       display:grid;
       gap:12px;
+      z-index:25;
+    }
+
+    .page-indicator{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:max-content;
+      padding:10px 14px;
+      border-radius:999px;
+      background:#111827;
+      border:1px solid #1f2937;
+      font-size:15px;
+      font-weight:800;
+      color:#fff;
+    }
+
+    .hint{
+      color:var(--muted);
+      font-size:16px;
+      line-height:1.45;
     }
 
     .fields{
       display:grid;
       gap:12px;
-      grid-template-columns:1fr;
     }
 
     .field{
@@ -298,8 +297,8 @@
     }
 
     .field label{
-      font-size:14px;
       color:var(--muted);
+      font-size:14px;
       font-weight:700;
     }
 
@@ -307,23 +306,28 @@
     .field textarea{
       width:100%;
       border-radius:14px;
-      border:1px solid var(--line);
-      background:#0b1220;
-      color:var(--text);
+      border:1px solid #1f2937;
+      background:#0b0b0b;
+      color:#fff;
       padding:14px 16px;
       font-size:18px;
       outline:none;
     }
 
     .field textarea{
-      resize:none;
       min-height:90px;
+      resize:none;
+    }
+
+    .field input[readonly],
+    .field textarea[readonly]{
+      opacity:.95;
     }
 
     .actions{
       display:grid;
-      gap:10px;
       grid-template-columns:1fr 1fr;
+      gap:10px;
     }
 
     .actions.single{
@@ -334,17 +338,35 @@
       border:none;
       border-radius:16px;
       padding:16px 18px;
-      font-size:20px;
+      font-size:21px;
       font-weight:800;
+      color:#fff;
       cursor:pointer;
-      color:white;
     }
 
-    .btn-primary{ background:var(--accent); }
-    .btn-primary:active{ background:var(--accent-dark); }
+    .btn-primary{
+      background:var(--accent);
+    }
 
-    .btn-secondary{ background:#334155; }
-    .btn-danger{ background:var(--danger); }
+    .btn-primary:active{
+      background:var(--accent-dark);
+    }
+
+    .btn-secondary{
+      background:var(--secondary);
+    }
+
+    .btn-secondary:active{
+      background:var(--secondary-dark);
+    }
+
+    .btn-danger{
+      background:var(--danger);
+    }
+
+    .btn-danger:active{
+      background:var(--danger-dark);
+    }
 
     .msg{
       display:none;
@@ -354,38 +376,43 @@
       line-height:1.4;
     }
 
-    .msg.show{ display:block; }
+    .msg.show{
+      display:block;
+    }
+
     .msg.ok{
-      background:rgba(22,163,74,.16);
+      background:rgba(22,163,74,.14);
       border:1px solid rgba(22,163,74,.45);
     }
+
     .msg.err{
-      background:rgba(220,38,38,.16);
+      background:rgba(220,38,38,.14);
       border:1px solid rgba(220,38,38,.45);
     }
 
-    .hint{
-      color:var(--muted);
-      font-size:16px;
-      line-height:1.45;
-    }
-
     .loading{
-      color:var(--muted);
-      font-size:22px;
+      color:#9ca3af;
+      font-size:24px;
       text-align:center;
     }
 
     @media (max-width: 900px){
-      .title{ font-size:21px; }
-      .subtitle{ font-size:14px; }
-      .standby h1{ font-size:34px; }
-      .standby p{ font-size:19px; }
-      .doc-stage{ padding:12px 78px; }
+      .title{
+        font-size:21px;
+      }
+
+      .subtitle{
+        font-size:14px;
+      }
+
+      .doc-stage{
+        padding:12px 78px;
+      }
+
       .nav-btn{
-        width:66px;
-        height:66px;
-        font-size:30px;
+        width:68px;
+        height:68px;
+        font-size:32px;
       }
     }
   </style>
@@ -404,26 +431,22 @@
       <div class="standby-card">
         <div class="standby-logo-wrap">
           <img id="standbyLogo" class="standby-logo hidden" alt="Logo" />
-          <div id="standbyFallback" class="standby-fallback">K</div>
+          <div id="standbyFallback" class="standby-fallback">LOGO</div>
         </div>
-        <h1>Willkommen</h1>
-        <p>
-          Bitte warten Sie, bis ein Dokument geöffnet wird.
-        </p>
       </div>
     </div>
 
     <div id="liveView" class="live hidden">
-      <div class="content">
-        <div class="doc-stage">
-          <button id="prevBtn" class="nav-btn nav-left" type="button">‹</button>
-          <div class="pdf-shell">
-            <div class="page-frame" id="pageFrame">
-              <div class="loading" id="loadingText">Dokument wird geladen …</div>
-            </div>
+      <div class="doc-stage">
+        <button id="prevBtn" class="nav-btn nav-left" type="button">‹</button>
+
+        <div class="pdf-shell">
+          <div class="page-frame" id="pageFrame">
+            <div class="loading">Dokument wird geladen …</div>
           </div>
-          <button id="nextBtn" class="nav-btn nav-right" type="button">›</button>
         </div>
+
+        <button id="nextBtn" class="nav-btn nav-right" type="button">›</button>
       </div>
 
       <div class="bottom-panel">
@@ -434,31 +457,31 @@
         <div id="mode1Fields" class="fields hidden">
           <div class="field">
             <label for="name">Name</label>
-            <input id="name" type="text" placeholder="Vor- und Nachname" />
+            <input id="name" type="text" readonly />
           </div>
           <div class="field">
             <label for="email">E-Mail</label>
-            <input id="email" type="email" placeholder="name@mail.de" />
+            <input id="email" type="text" readonly />
           </div>
           <div class="field">
             <label for="phone">Telefonnummer</label>
-            <input id="phone" type="text" placeholder="z. B. 0170..." />
+            <input id="phone" type="text" readonly />
           </div>
         </div>
 
         <div id="mode3Fields" class="fields hidden">
           <div class="field">
             <label for="name3">Name</label>
-            <input id="name3" type="text" placeholder="Vor- und Nachname" />
+            <input id="name3" type="text" readonly />
           </div>
           <div class="field">
             <label for="reason">Grund</label>
-            <textarea id="reason" placeholder="Bitte Grund eingeben"></textarea>
+            <textarea id="reason" readonly></textarea>
           </div>
         </div>
 
         <div id="mode2Info" class="hint hidden">
-          Dieses Dokument wird nur angezeigt. Über „Dokument schließen“ kann es beendet werden.
+          Dieses Dokument wird nur angezeigt.
         </div>
 
         <div id="signActions" class="actions hidden">
@@ -479,7 +502,7 @@
     import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
     pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
-    const STANDBY_LOGO = "/logo-portrait.png";
+    const STANDBY_LOGO = "/logo.png";
 
     const url = new URL(window.location.href);
     const screen = url.searchParams.get("screen") === "2" ? "2" : "1";
@@ -489,13 +512,12 @@
     const titleText = document.getElementById("titleText");
     const subtitleText = document.getElementById("subtitleText");
     const screenBadge = document.getElementById("screenBadge");
+
     const standbyLogo = document.getElementById("standbyLogo");
     const standbyFallback = document.getElementById("standbyFallback");
 
     const pageFrame = document.getElementById("pageFrame");
     const pageIndicator = document.getElementById("pageIndicator");
-    const loadingText = document.getElementById("loadingText");
-
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
 
@@ -521,9 +543,8 @@
 
     let pdfDoc = null;
     let currentPage = 1;
-    let pageStates = []; // [{ pdfCanvas, drawCanvas }]
+    let pageStates = [];
     let renderToken = 0;
-    let pollTimer = null;
 
     titleText.textContent = `Kiosk – Screen ${screen}`;
     screenBadge.textContent = `Screen ${screen}`;
@@ -554,6 +575,7 @@
       standbyView.classList.remove("hidden");
       liveView.classList.add("hidden");
       subtitleText.textContent = "Standby";
+
       currentPdfUrl = null;
       currentVersion = null;
       currentMode = null;
@@ -561,7 +583,7 @@
       pdfDoc = null;
       currentPage = 1;
       pageStates = [];
-      pageFrame.innerHTML = '<div class="loading" id="loadingText">Dokument wird geladen …</div>';
+      pageFrame.innerHTML = '<div class="loading">Dokument wird geladen …</div>';
       clearMsg();
     }
 
@@ -585,6 +607,7 @@
         mode1Fields.classList.remove("hidden");
         signActions.classList.remove("hidden");
         modeHint.textContent = "Bitte prüfen Sie das Dokument und unterschreiben Sie auf den Seiten.";
+
         nameInput.value = session?.name || "";
         emailInput.value = session?.email || "";
         phoneInput.value = session?.phone || "";
@@ -592,6 +615,7 @@
         mode3Fields.classList.remove("hidden");
         signActions.classList.remove("hidden");
         modeHint.textContent = "Bitte prüfen Sie das Dokument und unterschreiben Sie auf den Seiten.";
+
         name3Input.value = session?.name || "";
         reasonInput.value = session?.reason || "";
       } else {
@@ -601,65 +625,29 @@
       }
     }
 
-    function getSessionPayload() {
-      if (currentMode === "mode1") {
-        return {
-          mode: "mode1",
-          name: nameInput.value.trim(),
-          email: emailInput.value.trim(),
-          phone: phoneInput.value.trim()
-        };
-      }
-
-      if (currentMode === "mode3") {
-        return {
-          mode: "mode3",
-          name: name3Input.value.trim(),
-          reason: reasonInput.value.trim()
-        };
-      }
-
-      return { mode: "mode2" };
-    }
-
-    async function syncSessionForSign() {
-      const payload = getSessionPayload();
-
-      const res = await fetch(`/api/session?screen=${screen}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Daten konnten nicht gespeichert werden.");
-      }
-
-      return data;
-    }
-
     function updatePageIndicator() {
       const total = pdfDoc ? pdfDoc.numPages : 1;
       pageIndicator.textContent = `Seite ${currentPage} / ${total}`;
-      prevBtn.style.visibility = currentPage <= 1 ? "hidden" : "visible";
-      nextBtn.style.visibility = currentPage >= total ? "hidden" : "visible";
+
+      prevBtn.disabled = currentPage <= 1;
+      nextBtn.disabled = currentPage >= total;
     }
 
-    function createBlankOverlay(width, height) {
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      return canvas;
+    function createBlankCanvas(width, height) {
+      const c = document.createElement("canvas");
+      c.width = width;
+      c.height = height;
+      return c;
     }
 
-    function setupDrawing(drawCanvas) {
-      const ctx = drawCanvas.getContext("2d");
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.lineWidth = 2.6;
-      ctx.strokeStyle = "#111827";
+    function setupDrawing(drawCanvas, overlayCanvas) {
+      const drawCtx = drawCanvas.getContext("2d");
+      drawCtx.lineCap = "round";
+      drawCtx.lineJoin = "round";
+      drawCtx.lineWidth = 2.8;
+      drawCtx.strokeStyle = "#111827";
+
+      drawCtx.drawImage(overlayCanvas, 0, 0);
 
       let drawing = false;
 
@@ -678,26 +666,33 @@
         };
       }
 
+      function persist() {
+        const overlayCtx = overlayCanvas.getContext("2d");
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        overlayCtx.drawImage(drawCanvas, 0, 0);
+      }
+
       function start(event) {
         event.preventDefault();
         drawing = true;
         const p = getPos(event);
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
+        drawCtx.beginPath();
+        drawCtx.moveTo(p.x, p.y);
       }
 
       function move(event) {
         if (!drawing) return;
         event.preventDefault();
         const p = getPos(event);
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
+        drawCtx.lineTo(p.x, p.y);
+        drawCtx.stroke();
       }
 
       function end(event) {
         if (!drawing) return;
         event.preventDefault();
         drawing = false;
+        persist();
       }
 
       drawCanvas.addEventListener("mousedown", start);
@@ -711,50 +706,11 @@
 
       return {
         clear() {
-          ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+          drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+          const overlayCtx = overlayCanvas.getContext("2d");
+          overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
         }
       };
-    }
-
-    function mergePageWithOverlay(pageIndex) {
-      const state = pageStates[pageIndex];
-      if (!state) return null;
-
-      const merged = document.createElement("canvas");
-      merged.width = state.pdfCanvas.width;
-      merged.height = state.pdfCanvas.height;
-
-      const ctx = merged.getContext("2d");
-      ctx.drawImage(state.pdfCanvas, 0, 0);
-      ctx.drawImage(state.overlayCanvas, 0, 0);
-
-      return {
-        pageIndex,
-        image: merged.toDataURL("image/png")
-      };
-    }
-
-    function buildOverlaysPayload() {
-      const result = [];
-      for (let i = 0; i < pageStates.length; i++) {
-        const merged = mergePageWithOverlay(i);
-        if (merged) result.push(merged);
-      }
-      return result;
-    }
-
-    function clearCurrentPage() {
-      const state = pageStates[currentPage - 1];
-      if (!state) return;
-
-      const ctx = state.overlayCanvas.getContext("2d");
-      ctx.clearRect(0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
-
-      const liveCanvas = pageFrame.querySelector(".draw-canvas");
-      if (liveCanvas) {
-        const liveCtx = liveCanvas.getContext("2d");
-        liveCtx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
-      }
     }
 
     async function renderCurrentPage() {
@@ -771,8 +727,8 @@
       const maxWidth = Math.max(200, frameRect.width - 10);
       const maxHeight = Math.max(200, frameRect.height - 10);
 
-      const rawViewport = page.getViewport({ scale: 1 });
-      const scale = Math.min(maxWidth / rawViewport.width, maxHeight / rawViewport.height);
+      const baseViewport = page.getViewport({ scale: 1 });
+      const scale = Math.min(maxWidth / baseViewport.width, maxHeight / baseViewport.height);
       const viewport = page.getViewport({ scale });
 
       const pdfCanvas = document.createElement("canvas");
@@ -780,36 +736,36 @@
       pdfCanvas.width = viewport.width;
       pdfCanvas.height = viewport.height;
 
+      const pdfCtx = pdfCanvas.getContext("2d");
+      await page.render({ canvasContext: pdfCtx, viewport }).promise;
+      if (token !== renderToken) return;
+
+      const index = currentPage - 1;
+      const existing = pageStates[index];
+
+      let overlayCanvas;
+      if (existing && existing.overlayCanvas) {
+        overlayCanvas = createBlankCanvas(viewport.width, viewport.height);
+        overlayCanvas.getContext("2d").drawImage(
+          existing.overlayCanvas,
+          0, 0, existing.overlayCanvas.width, existing.overlayCanvas.height,
+          0, 0, viewport.width, viewport.height
+        );
+      } else {
+        overlayCanvas = createBlankCanvas(viewport.width, viewport.height);
+      }
+
+      pageStates[index] = {
+        pdfCanvas,
+        overlayCanvas
+      };
+
       const drawCanvas = document.createElement("canvas");
       drawCanvas.className = "draw-canvas";
       drawCanvas.width = viewport.width;
       drawCanvas.height = viewport.height;
       drawCanvas.style.width = viewport.width + "px";
       drawCanvas.style.height = viewport.height + "px";
-
-      const pdfCtx = pdfCanvas.getContext("2d");
-      await page.render({ canvasContext: pdfCtx, viewport }).promise;
-      if (token !== renderToken) return;
-
-      if (!pageStates[currentPage - 1]) {
-        pageStates[currentPage - 1] = {
-          pdfCanvas,
-          overlayCanvas: createBlankOverlay(viewport.width, viewport.height),
-          width: viewport.width,
-          height: viewport.height
-        };
-      } else {
-        const existingOverlay = pageStates[currentPage - 1].overlayCanvas;
-        const resized = createBlankOverlay(viewport.width, viewport.height);
-        resized.getContext("2d").drawImage(existingOverlay, 0, 0, viewport.width, viewport.height);
-
-        pageStates[currentPage - 1] = {
-          pdfCanvas,
-          overlayCanvas: resized,
-          width: viewport.width,
-          height: viewport.height
-        };
-      }
 
       const wrap = document.createElement("div");
       wrap.className = "page-canvas-wrap";
@@ -822,26 +778,8 @@
       pageFrame.innerHTML = "";
       pageFrame.appendChild(wrap);
 
-      const overlayCtx = drawCanvas.getContext("2d");
-      overlayCtx.drawImage(pageStates[currentPage - 1].overlayCanvas, 0, 0);
-
-      const drawingTools = setupDrawing(drawCanvas);
-
-      const originalMoveHandler = drawCanvas.onmousemove;
-      drawCanvas.addEventListener("pointerup", persistOverlay);
-      drawCanvas.addEventListener("mouseup", persistOverlay);
-      drawCanvas.addEventListener("touchend", persistOverlay, { passive: false });
-      drawCanvas.addEventListener("touchcancel", persistOverlay, { passive: false });
-
-      function persistOverlay() {
-        const targetState = pageStates[currentPage - 1];
-        if (!targetState) return;
-        const ctx = targetState.overlayCanvas.getContext("2d");
-        ctx.clearRect(0, 0, targetState.overlayCanvas.width, targetState.overlayCanvas.height);
-        ctx.drawImage(drawCanvas, 0, 0);
-      }
-
-      drawCanvas.addEventListener("mouseleave", persistOverlay);
+      const tools = setupDrawing(drawCanvas, overlayCanvas);
+      drawCanvas._clearOverlay = tools.clear;
 
       updatePageIndicator();
     }
@@ -866,12 +804,52 @@
       await renderCurrentPage();
     }
 
+    function clearCurrentPage() {
+      const drawCanvas = pageFrame.querySelector(".draw-canvas");
+      if (drawCanvas && typeof drawCanvas._clearOverlay === "function") {
+        drawCanvas._clearOverlay();
+      }
+    }
+
+    function buildOverlaysPayload() {
+      const result = [];
+
+      for (let i = 0; i < pageStates.length; i++) {
+        const state = pageStates[i];
+        if (!state || !state.pdfCanvas || !state.overlayCanvas) continue;
+
+        const merged = document.createElement("canvas");
+        merged.width = state.pdfCanvas.width;
+        merged.height = state.pdfCanvas.height;
+
+        const ctx = merged.getContext("2d");
+        ctx.drawImage(state.pdfCanvas, 0, 0);
+        ctx.drawImage(state.overlayCanvas, 0, 0);
+
+        result.push({
+          pageIndex: i,
+          image: merged.toDataURL("image/png")
+        });
+      }
+
+      return result;
+    }
+
     async function submitSignedDocument() {
       try {
         clearMsg();
-        await syncSessionForSign();
+
+        if (currentMode === "mode2") {
+          setMsg("Dieses Dokument ist nur zum Anzeigen gedacht.", "err");
+          return;
+        }
 
         const overlays = buildOverlaysPayload();
+
+        if (!overlays.length) {
+          setMsg("Keine Signatur erhalten.", "err");
+          return;
+        }
 
         const res = await fetch(`/api/sign?screen=${screen}`, {
           method: "POST",
@@ -886,6 +864,7 @@
         }
 
         setMsg("Dokument wurde erfolgreich bestätigt.", "ok");
+
         setTimeout(() => {
           showStandby();
         }, 1200);
@@ -961,6 +940,7 @@
 
     pageFrame.addEventListener("touchend", async (e) => {
       if (touchStartX === null || touchStartY === null) return;
+
       const touch = e.changedTouches && e.changedTouches[0];
       if (!touch) return;
 
@@ -987,7 +967,7 @@
 
     showStandby();
     pollDocument();
-    pollTimer = setInterval(pollDocument, 2000);
+    setInterval(pollDocument, 2000);
   </script>
 </body>
 </html>
