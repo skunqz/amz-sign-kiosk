@@ -687,11 +687,27 @@ app.post("/api/sign", async (req, res) => {
 
     await createSignedPdf(originalPdfPath, overlays, signedPdfPath);
 
-    let dropboxResult = null;
-    if (process.env.DROPBOX_ACCESS_TOKEN) {
-      const dropboxFileName = buildDropboxFilename(session);
-      dropboxResult = await uploadFileToDropbox(signedPdfPath, dropboxFileName);
-    }
+let dropboxResult = null;
+
+if (process.env.DROPBOX_ACCESS_TOKEN) {
+  try {
+    const dropboxFileName = buildDropboxFilename(session);
+
+    console.log("Starte Dropbox Upload...");
+    dropboxResult = await uploadFileToDropbox(signedPdfPath, dropboxFileName);
+
+    console.log("Dropbox Upload erfolgreich:", dropboxResult?.path);
+    console.log("Dropbox Token vorhanden:", !!process.env.DROPBOX_ACCESS_TOKEN);
+    console.log("Dropbox Ordner:", process.env.DROPBOX_FOLDER);
+
+  } catch (err) {
+    console.error("❌ Dropbox Fehler:", err.message || err);
+
+    // ❗ GANZ WICHTIG:
+    // Fehler ignorieren, damit Email trotzdem rausgeht
+    dropboxResult = null;
+  }
+}
 
     const mailContent = buildMailContent(
       session,
