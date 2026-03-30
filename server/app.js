@@ -30,6 +30,7 @@ if (!fs.existsSync(signedRootDir)) fs.mkdirSync(signedRootDir, { recursive: true
 for (const screen of ALLOWED_SCREENS) {
   const uploadDir = path.join(uploadsRootDir, `screen${screen}`);
   const signedDir = path.join(signedRootDir, `screen${screen}`);
+
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
   if (!fs.existsSync(signedDir)) fs.mkdirSync(signedDir, { recursive: true });
 }
@@ -69,6 +70,7 @@ function parseCookies(req) {
   header.split(";").forEach((part) => {
     const idx = part.indexOf("=");
     if (idx === -1) return;
+
     const key = part.slice(0, idx).trim();
     const value = part.slice(idx + 1).trim();
     cookies[key] = decodeURIComponent(value);
@@ -139,17 +141,15 @@ function clearAuthCookie(res) {
 
 function requireAdminAuth(req, res, next) {
   if (!isAdminAuthenticated(req)) {
-    return res.status(401).json({
-      success: false,
-      error: "Nicht eingeloggt"
-    });
+    return res.status(401).json({ success: false, error: "Nicht eingeloggt" });
   }
   next();
 }
 
 function getAllPdfFiles(screen) {
-  return fs.readdirSync(getUploadsDir(screen))
-    .filter(f => f.toLowerCase().endsWith(".pdf"))
+  return fs
+    .readdirSync(getUploadsDir(screen))
+    .filter((f) => f.toLowerCase().endsWith(".pdf"))
     .sort();
 }
 
@@ -189,7 +189,7 @@ function readStatus(screen) {
       filename: null,
       lastSignedAt: null,
       lastSignedName: null,
-      lastSignedFile: null
+      lastSignedFile: null,
     };
   }
 
@@ -203,7 +203,7 @@ function readStatus(screen) {
       filename: null,
       lastSignedAt: null,
       lastSignedName: null,
-      lastSignedFile: null
+      lastSignedFile: null,
     };
   }
 }
@@ -223,7 +223,7 @@ function updateLiveStatus(screen, patch = {}) {
     mode: session?.mode || null,
     name: session?.name || null,
     filename: currentPdf || null,
-    ...patch
+    ...patch,
   };
 
   saveStatus(screen, nextStatus);
@@ -237,14 +237,14 @@ function validateSessionPayload(payload) {
   }
 
   if (mode === "mode1") {
-    if (!payload.name || !payload.email || !payload.phone) {
-      return "Bitte Name, E-Mail und Telefonnummer ausfüllen.";
+    if (!payload.name || !payload.email || !payload.phone || !payload.plate) {
+      return "Bitte Name, E-Mail, Telefonnummer und KFZ-Kennzeichen ausfüllen.";
     }
   }
 
   if (mode === "mode3") {
-    if (!payload.name || !payload.reason) {
-      return "Bitte Name und Grund ausfüllen.";
+    if (!payload.name || !payload.plate || !payload.reason) {
+      return "Bitte Name, KFZ-Kennzeichen und Grund ausfüllen.";
     }
   }
 
@@ -255,7 +255,7 @@ function getUploader(screen) {
   const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, getUploadsDir(screen)),
     filename: (req, file, cb) => {
-      const safeName = Date.now() + "-" + file.originalname.replace(/\s+/g, "_");
+      const safeName = `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`;
       cb(null, safeName);
     },
   });
@@ -288,7 +288,7 @@ async function createSignedPdf(originalPdfPath, overlays, outputPdfPath) {
       x: 0,
       y: 0,
       width,
-      height
+      height,
     });
   }
 
@@ -298,6 +298,7 @@ async function createSignedPdf(originalPdfPath, overlays, outputPdfPath) {
 
 function buildMailContent(session, currentPdf, screen) {
   const screenLabel = getScreenLabel(screen);
+  const now = new Date().toLocaleString("de-DE");
 
   if (session.mode === "mode1") {
     return {
@@ -309,9 +310,10 @@ function buildMailContent(session, currentPdf, screen) {
         <p><strong>Name:</strong> ${session.name}</p>
         <p><strong>E-Mail:</strong> ${session.email}</p>
         <p><strong>Telefonnummer:</strong> ${session.phone}</p>
-        <p><strong>Zeit:</strong> ${new Date().toLocaleString("de-DE")}</p>
+        <p><strong>KFZ-Kennzeichen:</strong> ${session.plate}</p>
+        <p><strong>Zeit:</strong> ${now}</p>
         <p><strong>Datei:</strong> ${currentPdf}</p>
-      `
+      `,
     };
   }
 
@@ -323,10 +325,11 @@ function buildMailContent(session, currentPdf, screen) {
         <p><strong>Screen:</strong> ${screenLabel}</p>
         <p><strong>Modus:</strong> Dokument unterzeichnen mit Name und Grund</p>
         <p><strong>Name:</strong> ${session.name}</p>
+        <p><strong>KFZ-Kennzeichen:</strong> ${session.plate}</p>
         <p><strong>Grund:</strong> ${session.reason}</p>
-        <p><strong>Zeit:</strong> ${new Date().toLocaleString("de-DE")}</p>
+        <p><strong>Zeit:</strong> ${now}</p>
         <p><strong>Datei:</strong> ${currentPdf}</p>
-      `
+      `,
     };
   }
 
@@ -335,9 +338,9 @@ function buildMailContent(session, currentPdf, screen) {
     html: `
       <h2>PDF wurde angezeigt</h2>
       <p><strong>Screen:</strong> ${screenLabel}</p>
-      <p><strong>Zeit:</strong> ${new Date().toLocaleString("de-DE")}</p>
+      <p><strong>Zeit:</strong> ${now}</p>
       <p><strong>Datei:</strong> ${currentPdf}</p>
-    `
+    `,
   };
 }
 
@@ -365,7 +368,7 @@ app.post("/admin/login", (req, res) => {
   if (!adminUser || !adminPass) {
     return res.status(500).json({
       success: false,
-      error: "Admin-Zugang ist nicht konfiguriert."
+      error: "Admin-Zugang ist nicht konfiguriert.",
     });
   }
 
@@ -375,12 +378,11 @@ app.post("/admin/login", (req, res) => {
   if (username !== adminUser || password !== adminPass) {
     return res.status(401).json({
       success: false,
-      error: "Benutzername oder Passwort ist falsch."
+      error: "Benutzername oder Passwort ist falsch.",
     });
   }
 
   setAuthCookie(res, username);
-
   return res.json({ success: true });
 });
 
@@ -392,7 +394,7 @@ app.post("/admin/logout", (req, res) => {
 app.get("/api/admin/me", (req, res) => {
   return res.json({
     authenticated: isAdminAuthenticated(req),
-    screens: ALLOWED_SCREENS
+    screens: ALLOWED_SCREENS,
   });
 });
 
@@ -435,7 +437,7 @@ app.get("/api/status", requireAdminAuth, (req, res) => {
     lastSignedAt: currentStatus.lastSignedAt || null,
     lastSignedName: currentStatus.lastSignedName || null,
     lastSignedFile: currentStatus.lastSignedFile || null,
-    screen
+    screen,
   });
 });
 
@@ -453,8 +455,9 @@ app.post("/api/session", requireAdminAuth, (req, res) => {
     name: String(req.body.name || "").trim(),
     email: String(req.body.email || "").trim(),
     phone: String(req.body.phone || "").trim(),
+    plate: String(req.body.plate || "").trim(),
     reason: String(req.body.reason || "").trim(),
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   };
 
   const error = validateSessionPayload(payload);
@@ -465,11 +468,7 @@ app.post("/api/session", requireAdminAuth, (req, res) => {
   saveSession(screen, payload);
   updateLiveStatus(screen);
 
-  return res.json({
-    success: true,
-    session: payload,
-    screen
-  });
+  return res.json({ success: true, session: payload, screen });
 });
 
 app.post("/api/upload", requireAdminAuth, (req, res) => {
@@ -478,10 +477,7 @@ app.post("/api/upload", requireAdminAuth, (req, res) => {
 
   upload(req, res, (err) => {
     if (err) {
-      return res.status(500).json({
-        success: false,
-        error: "Fehler beim Hochladen"
-      });
+      return res.status(500).json({ success: false, error: "Fehler beim Hochladen" });
     }
 
     const session = readSession(screen);
@@ -493,15 +489,12 @@ app.post("/api/upload", requireAdminAuth, (req, res) => {
 
       return res.status(400).json({
         success: false,
-        error: "Bitte zuerst eine Option auswählen und die erforderlichen Daten eingeben."
+        error: "Bitte zuerst eine Option auswählen und die erforderlichen Daten eingeben.",
       });
     }
 
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: "Keine PDF hochgeladen"
-      });
+      return res.status(400).json({ success: false, error: "Keine PDF hochgeladen" });
     }
 
     const allFiles = getAllPdfFiles(screen);
@@ -519,7 +512,7 @@ app.post("/api/upload", requireAdminAuth, (req, res) => {
     return res.json({
       success: true,
       filename: req.file.filename,
-      screen
+      screen,
     });
   });
 });
@@ -534,7 +527,7 @@ app.get("/api/document", (req, res) => {
     return res.json({
       status: "empty",
       version: Date.now(),
-      screen
+      screen,
     });
   }
 
@@ -547,7 +540,7 @@ app.get("/api/document", (req, res) => {
     version: fs.statSync(filePath).mtimeMs,
     mode: session.mode,
     session,
-    screen
+    screen,
   });
 });
 
@@ -559,37 +552,28 @@ app.post("/api/sign", async (req, res) => {
     const currentPdf = getCurrentPdfFile(screen);
 
     if (!session) {
-      return res.status(400).json({
-        success: false,
-        error: "Keine aktive Sitzung vorhanden"
-      });
+      return res.status(400).json({ success: false, error: "Keine aktive Sitzung vorhanden" });
     }
 
     if (session.mode === "mode2") {
       return res.status(400).json({
         success: false,
-        error: "Dieses Dokument ist nur zum Anzeigen gedacht."
+        error: "Dieses Dokument ist nur zum Anzeigen gedacht.",
       });
     }
 
     if (!currentPdf) {
-      return res.status(400).json({
-        success: false,
-        error: "Kein PDF vorhanden"
-      });
+      return res.status(400).json({ success: false, error: "Kein PDF vorhanden" });
     }
 
     if (!overlays.length) {
-      return res.status(400).json({
-        success: false,
-        error: "Keine Signatur erhalten"
-      });
+      return res.status(400).json({ success: false, error: "Keine Signatur erhalten" });
     }
 
     if (!process.env.RESEND_API_KEY || !process.env.MAIL_FROM || !process.env.MAIL_TO) {
       return res.status(500).json({
         success: false,
-        error: "Mail-Konfiguration unvollständig"
+        error: "Mail-Konfiguration unvollständig",
       });
     }
 
@@ -610,15 +594,15 @@ app.post("/api/sign", async (req, res) => {
       attachments: [
         {
           filename: signedPdfName,
-          content: fs.readFileSync(signedPdfPath).toString("base64")
-        }
-      ]
+          content: fs.readFileSync(signedPdfPath).toString("base64"),
+        },
+      ],
     });
 
     if (result.error) {
       return res.status(500).json({
         success: false,
-        error: result.error.message || JSON.stringify(result.error)
+        error: result.error.message || JSON.stringify(result.error),
       });
     }
 
@@ -633,7 +617,7 @@ app.post("/api/sign", async (req, res) => {
       filename: null,
       lastSignedAt: new Date().toISOString(),
       lastSignedName: session?.name || "Unbekannt",
-      lastSignedFile: currentPdf
+      lastSignedFile: currentPdf,
     });
 
     clearSession(screen);
@@ -641,14 +625,13 @@ app.post("/api/sign", async (req, res) => {
     return res.json({
       success: true,
       emailId: result.data?.id || null,
-      screen
+      screen,
     });
   } catch (error) {
     console.error("FEHLER /api/sign:", error);
-
     return res.status(500).json({
       success: false,
-      error: error.message || "Unbekannter Fehler"
+      error: error.message || "Unbekannter Fehler",
     });
   }
 });
@@ -660,10 +643,7 @@ app.post("/api/close", (req, res) => {
     const session = readSession(screen);
 
     if (session?.mode !== "mode2" && !isAdminAuthenticated(req)) {
-      return res.status(403).json({
-        success: false,
-        error: "Nicht erlaubt"
-      });
+      return res.status(403).json({ success: false, error: "Nicht erlaubt" });
     }
 
     if (currentPdf) {
@@ -678,19 +658,15 @@ app.post("/api/close", (req, res) => {
       active: false,
       mode: null,
       name: null,
-      filename: null
+      filename: null,
     });
 
-    return res.json({
-      success: true,
-      screen
-    });
+    return res.json({ success: true, screen });
   } catch (error) {
     console.error("FEHLER /api/close:", error);
-
     return res.status(500).json({
       success: false,
-      error: error.message || "Unbekannter Fehler"
+      error: error.message || "Unbekannter Fehler",
     });
   }
 });
