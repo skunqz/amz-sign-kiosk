@@ -729,6 +729,7 @@
 
       clearMsg();
       hidePopup();
+      updatePageIndicator();
     }
 
     function showLive() {
@@ -1055,45 +1056,51 @@
       return Date.now() < pollPausedUntil;
     }
 
+    async function fetchDocumentState() {
+      const res = await fetch(`/api/document?screen=${screen}`, {
+        cache: "no-store"
+      });
+      return await res.json();
+    }
+
+    async function syncFromServer(forceRender = false) {
+      const data = await fetchDocumentState();
+
+      if (data.status !== "ok" || !data.file) {
+        if (currentPdfUrl !== null || forceRender) {
+          showStandby();
+        }
+        return;
+      }
+
+      const incomingSessionKey = sessionKey(data.session || null, data.mode);
+      const docChanged = currentPdfUrl !== data.file || currentVersion !== data.version;
+      const modeChanged = currentMode !== data.mode;
+      const sessionChanged = currentSessionKey !== incomingSessionKey;
+
+      if (docChanged || forceRender) {
+        currentPdfUrl = data.file;
+        currentVersion = data.version;
+        showLive();
+        applyMode(data.mode, data.session || null);
+        await loadPdf(`${data.file}?v=${data.version}`);
+        return;
+      }
+
+      if (modeChanged || sessionChanged) {
+        applyMode(data.mode, data.session || null);
+        if (pdfDoc && modeChanged) {
+          await renderCurrentPage();
+        }
+      }
+    }
+
     async function pollDocument(force = false) {
       try {
         if (!force && shouldSkipPoll()) {
           return;
         }
-
-        const res = await fetch(`/api/document?screen=${screen}`, {
-          cache: "no-store"
-        });
-
-        const data = await res.json();
-
-        if (data.status !== "ok" || !data.file) {
-          if (currentPdfUrl !== null) {
-            showStandby();
-          }
-          return;
-        }
-
-        const incomingSessionKey = sessionKey(data.session || null, data.mode);
-        const docChanged = currentPdfUrl !== data.file || currentVersion !== data.version;
-        const modeChanged = currentMode !== data.mode;
-        const sessionChanged = currentSessionKey !== incomingSessionKey;
-
-        if (docChanged) {
-          currentPdfUrl = data.file;
-          currentVersion = data.version;
-          showLive();
-          applyMode(data.mode, data.session || null);
-          await loadPdf(`${data.file}?v=${data.version}`);
-          return;
-        }
-
-        if (modeChanged || sessionChanged) {
-          applyMode(data.mode, data.session || null);
-          if (pdfDoc && modeChanged) {
-            await renderCurrentPage();
-          }
-        }
+        await syncFromServer(false);
       } catch (error) {
         console.error(error);
       }
@@ -1112,40 +1119,17 @@
       if (event.origin !== window.location.origin) return;
 
       const data = event.data || {};
-      const currentUrl = new URL(window.location.href);
-      const currentScreen = currentUrl.searchParams.get("screen") === "2" ? "2" : "1";
-
-      if (data.screen && String(data.screen) !== currentScreen) return;
+      if (data.screen && String(data.screen) !== screen) return;
 
       if (data.type === "kiosk-force-close") {
-        pausePolling(1500);
+        pausePolling(1200);
         showStandby();
         return;
       }
 
       if (data.type === "kiosk-status-update") {
-        const status = data.status || {};
-
-        const nextActive = !!status.active;
-        const nextMode = status.mode || null;
-        const nextFileName = status.filename || null;
-
-        const currentActive = currentPdfUrl !== null;
-        const fileChanged = currentPdfUrl !== nextFileName && nextFileName !== null;
-        const modeChanged = currentMode !== nextMode;
-        const activeChanged = currentActive !== nextActive;
-
-        if (!nextActive) {
-          pausePolling(1500);
-          showStandby();
-          return;
-        }
-
-        if (fileChanged || modeChanged || activeChanged) {
-          pausePolling(1500);
-          await pollDocument(true);
-          return;
-        }
+        pausePolling(1200);
+        await pollDocument(true);
       }
     });
 
