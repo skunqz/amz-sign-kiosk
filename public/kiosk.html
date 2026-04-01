@@ -1,510 +1,1696 @@
-<script type="module">
-  import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AMZ-Kiosk v2</title>
 
-  const channel = new BroadcastChannel("amz-kiosk-sync");
-
-  const url = new URL(window.location.href);
-  const screen = url.searchParams.get("screen") === "2" ? "2" : "1";
-
-  const standbyView = document.getElementById("standbyView");
-  const liveView = document.getElementById("liveView");
-  const titleText = document.getElementById("titleText");
-  const subtitleText = document.getElementById("subtitleText");
-  const screenBadge = document.getElementById("screenBadge");
-
-  const standbyVideo1 = document.getElementById("standbyVideo1");
-  const standbyVideo2 = document.getElementById("standbyVideo2");
-  const standbyFallback = document.getElementById("standbyFallback");
-
-  const pageFrame = document.getElementById("pageFrame");
-  const pageIndicator = document.getElementById("pageIndicator");
-  const prevBtn = document.getElementById("prevBtn");
-  const nextBtn = document.getElementById("nextBtn");
-
-  const modeHint = document.getElementById("modeHint");
-  const mode1Fields = document.getElementById("mode1Fields");
-  const mode3Fields = document.getElementById("mode3Fields");
-  const mode2Info = document.getElementById("mode2Info");
-  const signActions = document.getElementById("signActions");
-  const viewActions = document.getElementById("viewActions");
-
-  const msg = document.getElementById("msg");
-  const sendPopup = document.getElementById("sendPopup");
-  const popupTitle = document.getElementById("popupTitle");
-  const popupText = document.getElementById("popupText");
-
-  const nameInput = document.getElementById("name");
-  const emailInput = document.getElementById("email");
-  const phoneInput = document.getElementById("phone");
-  const plateInput = document.getElementById("plate");
-
-  const name3Input = document.getElementById("name3");
-  const plate3Input = document.getElementById("plate3");
-  const reasonInput = document.getElementById("reason");
-
-  let currentPdfUrl = null;
-  let currentVersion = null;
-  let currentMode = null;
-  let currentSessionKey = null;
-
-  let pdfDoc = null;
-  let currentPage = 1;
-  let pageStates = [];
-  let renderToken = 0;
-
-  let pollTimer = null;
-  let pollPausedUntil = 0;
-  let applyingRemoteOverlay = false;
-  let suppressBroadcastUntil = 0;
-  let fadeTimeout = null;
-
-  let activeStandbyVideo = standbyVideo1;
-  let inactiveStandbyVideo = standbyVideo2;
-  let standbyCrossfading = false;
-  let standbyMonitorTimer = null;
-
-  const STANDBY_CROSSFADE_MS = 1200;
-  const STANDBY_SWITCH_BUFFER = 1.2;
-  const VIDEO_END_RESET_THRESHOLD = 0.35;
-
-  const standbyState = {
-    v1Ready: false,
-    v2Ready: false,
-    v1Failed: false,
-    v2Failed: false,
-    positions: {
-      standbyVideo1: 0,
-      standbyVideo2: 0
+  <style>
+    :root{
+      --bg:#000000;
+      --line:#1f2937;
+      --text:#ffffff;
+      --muted:#9ca3af;
+      --accent:#2563eb;
+      --accent-dark:#1d4ed8;
+      --danger:#dc2626;
+      --danger-dark:#b91c1c;
+      --secondary:#374151;
+      --secondary-dark:#1f2937;
     }
-  };
 
-  titleText.textContent = `Kiosk – Screen ${screen}`;
-  screenBadge.textContent = `Screen ${screen}`;
-
-  function videoId(video) {
-    return video?.id || "";
-  }
-
-  function markVideoReady(video) {
-    if (video === standbyVideo1) standbyState.v1Ready = true;
-    if (video === standbyVideo2) standbyState.v2Ready = true;
-    updateFallbackState();
-  }
-
-  function markVideoFailed(video) {
-    if (video === standbyVideo1) standbyState.v1Failed = true;
-    if (video === standbyVideo2) standbyState.v2Failed = true;
-    updateFallbackState();
-  }
-
-  function isVideoFailed(video) {
-    if (video === standbyVideo1) return standbyState.v1Failed;
-    if (video === standbyVideo2) return standbyState.v2Failed;
-    return false;
-  }
-
-  function updateFallbackState() {
-    const bothFailed = standbyState.v1Failed && standbyState.v2Failed;
-    if (bothFailed) {
-      standbyFallback.classList.remove("hidden");
-    } else {
-      standbyFallback.classList.add("hidden");
+    *{
+      box-sizing:border-box;
+      -webkit-tap-highlight-color:transparent;
     }
-  }
 
-  function resetStoredVideoPosition(video) {
-    const id = videoId(video);
-    if (!id) return;
-    standbyState.positions[id] = 0;
-  }
+    html, body{
+      margin:0;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:#000;
+      color:var(--text);
+      font-family:Arial, Helvetica, sans-serif;
+      touch-action:manipulation;
+    }
 
-  function rememberVideoPosition(video) {
-    if (!video) return;
-    const id = videoId(video);
-    if (!id) return;
-    if (!isFinite(video.currentTime) || video.currentTime < 0) return;
+    body{
+      display:flex;
+      flex-direction:column;
+    }
 
-    const duration = video.duration;
-    if (isFinite(duration) && duration > 0) {
-      const remaining = duration - video.currentTime;
+    .topbar{
+      flex:0 0 auto;
+      height:72px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      padding:14px 18px;
+      background:#000;
+      border-bottom:1px solid #111827;
+      z-index:30;
+    }
 
-      // Wenn Video praktisch am Ende ist, NICHT die Endposition merken,
-      // sonst startet es beim nächsten Mal wieder direkt vor Schluss.
-      if (remaining <= VIDEO_END_RESET_THRESHOLD) {
-        standbyState.positions[id] = 0;
-        return;
+    .topbar-left{
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+
+    .title{
+      font-size:24px;
+      font-weight:800;
+      line-height:1.1;
+    }
+
+    .subtitle{
+      color:var(--muted);
+      font-size:15px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .screen-badge{
+      flex:0 0 auto;
+      padding:10px 14px;
+      border-radius:999px;
+      background:#111827;
+      border:1px solid #1f2937;
+      font-size:15px;
+      font-weight:700;
+      color:#fff;
+    }
+
+    .main{
+      flex:1 1 auto;
+      min-height:0;
+      position:relative;
+      overflow:hidden;
+      background:#000;
+    }
+
+    .hidden{
+      display:none !important;
+    }
+
+    .standby{
+      position:absolute;
+      inset:0;
+      background:#000;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      opacity:1;
+      transition:opacity .45s ease;
+      z-index:5;
+    }
+
+    .standby.fade-out{
+      opacity:0;
+    }
+
+    .standby-card{
+      width:100%;
+      height:100%;
+      background:#000;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .standby-logo-wrap{
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#000;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .standby-video{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      background:#000;
+      display:block;
+      opacity:0;
+      transition:opacity 1.2s ease;
+      pointer-events:none;
+    }
+
+    .standby-video.active{
+      opacity:1;
+    }
+
+    .standby-fallback{
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#000;
+      color:#fff;
+      font-size:120px;
+      font-weight:800;
+      letter-spacing:2px;
+      position:absolute;
+      inset:0;
+      z-index:3;
+    }
+
+    .live{
+      position:absolute;
+      inset:0;
+      display:flex;
+      flex-direction:column;
+      min-height:0;
+      background:#000;
+      opacity:1;
+      transition:opacity .45s ease;
+      z-index:10;
+    }
+
+    .live.fade-in{
+      animation:liveFadeIn .45s ease;
+    }
+
+    @keyframes liveFadeIn{
+      from{ opacity:0; }
+      to{ opacity:1; }
+    }
+
+    .doc-stage{
+      flex:1 1 auto;
+      min-height:0;
+      position:relative;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:14px 86px;
+      overflow:hidden;
+      background:#000;
+    }
+
+    .pdf-shell{
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:0;
+      min-width:0;
+    }
+
+    .page-frame{
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      position:relative;
+      min-height:0;
+      min-width:0;
+    }
+
+    .page-canvas-wrap{
+      position:relative;
+      display:inline-block;
+      max-width:100%;
+      max-height:100%;
+      background:#fff;
+      border-radius:20px;
+      overflow:hidden;
+      box-shadow:0 16px 50px rgba(0,0,0,.45);
+      touch-action:none;
+    }
+
+    .page-canvas-wrap canvas{
+      display:block;
+      max-width:100%;
+      max-height:100%;
+      touch-action:none;
+    }
+
+    .pdf-canvas{
+      position:relative;
+      z-index:1;
+    }
+
+    .draw-canvas{
+      position:absolute;
+      inset:0;
+      z-index:2;
+      background:transparent;
+    }
+
+    .nav-btn{
+      position:absolute;
+      top:50%;
+      transform:translateY(-50%);
+      z-index:20;
+      width:76px;
+      height:76px;
+      border:none;
+      border-radius:999px;
+      background:rgba(17,24,39,.92);
+      color:#fff;
+      font-size:38px;
+      font-weight:800;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 8px 24px rgba(0,0,0,.35);
+      cursor:pointer;
+      user-select:none;
+    }
+
+    .nav-btn:active{
+      transform:translateY(-50%) scale(.97);
+    }
+
+    .nav-left{ left:10px; }
+    .nav-right{ right:10px; }
+
+    .nav-btn[disabled]{
+      opacity:.3;
+      cursor:default;
+    }
+
+    .bottom-panel{
+      flex:0 0 auto;
+      background:#000;
+      border-top:1px solid #111827;
+      padding:14px;
+      display:grid;
+      gap:12px;
+      z-index:25;
+      max-height:42vh;
+      overflow:auto;
+    }
+
+    .page-indicator{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:max-content;
+      padding:10px 14px;
+      border-radius:999px;
+      background:#111827;
+      border:1px solid #1f2937;
+      font-size:15px;
+      font-weight:800;
+      color:#fff;
+    }
+
+    .hint{
+      color:var(--muted);
+      font-size:16px;
+      line-height:1.45;
+    }
+
+    .fields{
+      display:grid;
+      gap:12px;
+    }
+
+    .field{
+      display:grid;
+      gap:6px;
+    }
+
+    .field label{
+      color:var(--muted);
+      font-size:14px;
+      font-weight:700;
+    }
+
+    .field input,
+    .field textarea{
+      width:100%;
+      border-radius:14px;
+      border:1px solid #1f2937;
+      background:#0b0b0b;
+      color:#fff;
+      padding:14px 16px;
+      font-size:18px;
+      outline:none;
+    }
+
+    .field textarea{
+      min-height:90px;
+      resize:none;
+    }
+
+    .field input[readonly],
+    .field textarea[readonly]{
+      opacity:.95;
+    }
+
+    .actions{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    .actions.single{
+      grid-template-columns:1fr;
+    }
+
+    .btn{
+      border:none;
+      border-radius:16px;
+      padding:16px 18px;
+      font-size:21px;
+      font-weight:800;
+      color:#fff;
+      cursor:pointer;
+    }
+
+    .btn-primary{
+      background:var(--accent);
+    }
+
+    .btn-primary:active{
+      background:var(--accent-dark);
+    }
+
+    .btn-secondary{
+      background:var(--secondary);
+    }
+
+    .btn-secondary:active{
+      background:var(--secondary-dark);
+    }
+
+    .btn-danger{
+      background:var(--danger);
+    }
+
+    .btn-danger:active{
+      background:var(--danger-dark);
+    }
+
+    .msg{
+      display:none;
+      padding:14px 16px;
+      border-radius:14px;
+      font-size:16px;
+      line-height:1.4;
+    }
+
+    .msg.show{
+      display:block;
+    }
+
+    .msg.ok{
+      background:rgba(22,163,74,.14);
+      border:1px solid rgba(22,163,74,.45);
+    }
+
+    .msg.err{
+      background:rgba(220,38,38,.14);
+      border:1px solid rgba(220,38,38,.45);
+    }
+
+    .loading{
+      color:#9ca3af;
+      font-size:24px;
+      text-align:center;
+    }
+
+    .popup-overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.72);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:9999;
+      opacity:0;
+      visibility:hidden;
+      transition:opacity .35s ease, visibility .35s ease;
+    }
+
+    .popup-overlay.show{
+      opacity:1;
+      visibility:visible;
+    }
+
+    .popup-box{
+      width:min(520px, 88vw);
+      background:rgba(17,24,39,.98);
+      border:1px solid #334155;
+      border-radius:24px;
+      padding:28px 24px;
+      text-align:center;
+      box-shadow:0 20px 60px rgba(0,0,0,.45);
+      transform:translateY(14px) scale(.96);
+      transition:transform .35s ease;
+    }
+
+    .popup-overlay.show .popup-box{
+      transform:translateY(0) scale(1);
+    }
+
+    .popup-spinner{
+      width:64px;
+      height:64px;
+      margin:0 auto 18px;
+      border-radius:50%;
+      border:6px solid rgba(255,255,255,.14);
+      border-top-color:#3b82f6;
+      animation:spin 1s linear infinite;
+    }
+
+    .popup-check{
+      width:72px;
+      height:72px;
+      margin:0 auto 18px;
+      border-radius:50%;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(22,163,74,.16);
+      border:2px solid rgba(22,163,74,.45);
+      color:#22c55e;
+      font-size:38px;
+      font-weight:800;
+    }
+
+    .popup-overlay.success .popup-spinner{
+      display:none;
+    }
+
+    .popup-overlay.success .popup-check{
+      display:flex;
+    }
+
+    .popup-title{
+      font-size:30px;
+      font-weight:800;
+      margin-bottom:10px;
+    }
+
+    .popup-text{
+      color:#cbd5e1;
+      font-size:18px;
+      line-height:1.5;
+    }
+
+    @keyframes spin{
+      from{ transform:rotate(0deg); }
+      to{ transform:rotate(360deg); }
+    }
+
+    @media (max-width: 900px){
+      .title{ font-size:21px; }
+      .subtitle{ font-size:14px; }
+      .doc-stage{ padding:12px 78px; }
+      .nav-btn{
+        width:68px;
+        height:68px;
+        font-size:32px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="title" id="titleText">Kiosk</div>
+      <div class="subtitle" id="subtitleText">Standby</div>
+    </div>
+    <div class="screen-badge" id="screenBadge">Screen 1</div>
+  </div>
+
+  <div class="main">
+    <div id="standbyView" class="standby">
+      <div class="standby-card">
+        <div class="standby-logo-wrap">
+          <video
+            id="standbyVideo1"
+            class="standby-video active"
+            muted
+            playsinline
+            preload="auto"
+          >
+            <source src="/amz-mov.mp4" type="video/mp4" />
+          </video>
+
+          <video
+            id="standbyVideo2"
+            class="standby-video"
+            muted
+            playsinline
+            preload="auto"
+          >
+            <source src="/amz-mov2.mp4" type="video/mp4" />
+          </video>
+
+          <div id="standbyFallback" class="standby-fallback hidden">VIDEO</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="liveView" class="live hidden">
+      <div class="doc-stage">
+        <button id="prevBtn" class="nav-btn nav-left" type="button">‹</button>
+
+        <div class="pdf-shell">
+          <div class="page-frame" id="pageFrame">
+            <div class="loading">Dokument wird geladen …</div>
+          </div>
+        </div>
+
+        <button id="nextBtn" class="nav-btn nav-right" type="button">›</button>
+      </div>
+
+      <div class="bottom-panel">
+        <div class="page-indicator" id="pageIndicator">Seite 1 / 1</div>
+
+        <div id="modeHint" class="hint">Bitte prüfen Sie das Dokument.</div>
+
+        <div id="mode1Fields" class="fields hidden">
+          <div class="field">
+            <label for="name">Name</label>
+            <input id="name" type="text" readonly />
+          </div>
+          <div class="field">
+            <label for="email">E-Mail</label>
+            <input id="email" type="text" readonly />
+          </div>
+          <div class="field">
+            <label for="phone">Telefonnummer</label>
+            <input id="phone" type="text" readonly />
+          </div>
+          <div class="field">
+            <label for="plate">KFZ-Kennzeichen</label>
+            <input id="plate" type="text" readonly />
+          </div>
+        </div>
+
+        <div id="mode3Fields" class="fields hidden">
+          <div class="field">
+            <label for="name3">Name</label>
+            <input id="name3" type="text" readonly />
+          </div>
+          <div class="field">
+            <label for="plate3">KFZ-Kennzeichen</label>
+            <input id="plate3" type="text" readonly />
+          </div>
+          <div class="field">
+            <label for="reason">Grund</label>
+            <textarea id="reason" readonly></textarea>
+          </div>
+        </div>
+
+        <div id="mode2Info" class="hint hidden">
+          Dieses Dokument wird nur angezeigt.
+        </div>
+
+        <div id="signActions" class="actions hidden">
+          <button type="button" class="btn btn-secondary" id="clearPageBtn">Seite leeren</button>
+          <button type="button" class="btn btn-primary" id="submitBtn">Dokument bestätigen</button>
+        </div>
+
+        <div id="viewActions" class="actions single hidden">
+          <button type="button" class="btn btn-danger" id="closeBtn">Dokument schließen</button>
+        </div>
+
+        <div id="msg" class="msg"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="sendPopup" class="popup-overlay">
+    <div class="popup-box">
+      <div class="popup-spinner"></div>
+      <div class="popup-check">✓</div>
+      <div class="popup-title" id="popupTitle">Auftrag wird verschickt</div>
+      <div class="popup-text" id="popupText">Bitte einen kurzen Moment warten …</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
+
+    const channel = new BroadcastChannel("amz-kiosk-sync");
+
+    const url = new URL(window.location.href);
+    const screen = url.searchParams.get("screen") === "2" ? "2" : "1";
+
+    const standbyView = document.getElementById("standbyView");
+    const liveView = document.getElementById("liveView");
+    const titleText = document.getElementById("titleText");
+    const subtitleText = document.getElementById("subtitleText");
+    const screenBadge = document.getElementById("screenBadge");
+
+    const standbyVideo1 = document.getElementById("standbyVideo1");
+    const standbyVideo2 = document.getElementById("standbyVideo2");
+    const standbyFallback = document.getElementById("standbyFallback");
+
+    const pageFrame = document.getElementById("pageFrame");
+    const pageIndicator = document.getElementById("pageIndicator");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+
+    const modeHint = document.getElementById("modeHint");
+    const mode1Fields = document.getElementById("mode1Fields");
+    const mode3Fields = document.getElementById("mode3Fields");
+    const mode2Info = document.getElementById("mode2Info");
+    const signActions = document.getElementById("signActions");
+    const viewActions = document.getElementById("viewActions");
+
+    const msg = document.getElementById("msg");
+    const sendPopup = document.getElementById("sendPopup");
+    const popupTitle = document.getElementById("popupTitle");
+    const popupText = document.getElementById("popupText");
+
+    const nameInput = document.getElementById("name");
+    const emailInput = document.getElementById("email");
+    const phoneInput = document.getElementById("phone");
+    const plateInput = document.getElementById("plate");
+
+    const name3Input = document.getElementById("name3");
+    const plate3Input = document.getElementById("plate3");
+    const reasonInput = document.getElementById("reason");
+
+    let currentPdfUrl = null;
+    let currentVersion = null;
+    let currentMode = null;
+    let currentSessionKey = null;
+
+    let pdfDoc = null;
+    let currentPage = 1;
+    let pageStates = [];
+    let renderToken = 0;
+
+    let pollTimer = null;
+    let pollPausedUntil = 0;
+    let applyingRemoteOverlay = false;
+    let suppressBroadcastUntil = 0;
+    let fadeTimeout = null;
+
+    let activeStandbyVideo = standbyVideo1;
+    let inactiveStandbyVideo = standbyVideo2;
+    let standbyCrossfading = false;
+    let standbyMonitorTimer = null;
+
+    const STANDBY_CROSSFADE_MS = 1200;
+    const STANDBY_SWITCH_BUFFER = 1.2;
+    const VIDEO_END_RESET_THRESHOLD = 0.35;
+
+    const standbyState = {
+      v1Ready: false,
+      v2Ready: false,
+      v1Failed: false,
+      v2Failed: false,
+      positions: {
+        standbyVideo1: 0,
+        standbyVideo2: 0
+      }
+    };
+
+    titleText.textContent = `Kiosk – Screen ${screen}`;
+    screenBadge.textContent = `Screen ${screen}`;
+
+    function videoId(video) {
+      return video.id;
+    }
+
+    function markVideoReady(video) {
+      if (video === standbyVideo1) standbyState.v1Ready = true;
+      if (video === standbyVideo2) standbyState.v2Ready = true;
+      updateFallbackState();
+    }
+
+    function markVideoFailed(video) {
+      if (video === standbyVideo1) standbyState.v1Failed = true;
+      if (video === standbyVideo2) standbyState.v2Failed = true;
+      updateFallbackState();
+    }
+
+    function isVideoFailed(video) {
+      if (video === standbyVideo1) return standbyState.v1Failed;
+      if (video === standbyVideo2) return standbyState.v2Failed;
+      return false;
+    }
+
+    function updateFallbackState() {
+      const bothFailed = standbyState.v1Failed && standbyState.v2Failed;
+      if (bothFailed) {
+        standbyFallback.classList.remove("hidden");
+      } else {
+        standbyFallback.classList.add("hidden");
       }
     }
 
-    standbyState.positions[id] = video.currentTime;
-  }
+    function rememberVideoPosition(video) {
+      if (!video) return;
+      const id = videoId(video);
+      if (!id) return;
+      if (!isFinite(video.currentTime) || video.currentTime < 0) return;
 
-  function restoreVideoPosition(video) {
-    const id = videoId(video);
-    const saved = standbyState.positions[id] || 0;
-
-    try {
       const duration = video.duration;
-
-      if (!isFinite(saved) || saved <= 0) {
-        video.currentTime = 0;
-        return;
-      }
-
       if (isFinite(duration) && duration > 0) {
-        const remaining = duration - saved;
+        const remaining = duration - video.currentTime;
 
-        // Wenn die gemerkte Position zu nah am Ende liegt, wieder bei 0 starten.
         if (remaining <= VIDEO_END_RESET_THRESHOLD) {
-          video.currentTime = 0;
           standbyState.positions[id] = 0;
           return;
         }
-
-        video.currentTime = Math.max(0, Math.min(saved, duration - 0.5));
-      } else {
-        video.currentTime = saved;
       }
-    } catch (e) {
-      try {
-        video.currentTime = 0;
-      } catch (_) {}
+
+      standbyState.positions[id] = video.currentTime;
     }
-  }
 
-  function setupStandbyVideo(video) {
-    video.loop = false;
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "auto";
-
-    video.addEventListener("loadedmetadata", () => {
-      markVideoReady(video);
-    });
-
-    video.addEventListener("canplay", () => {
-      markVideoReady(video);
-    });
-
-    video.addEventListener("timeupdate", () => {
-      rememberVideoPosition(video);
-    });
-
-    video.addEventListener("pause", () => {
-      rememberVideoPosition(video);
-    });
-
-    video.addEventListener("ended", async () => {
-      // Ganz wichtig: nach echtem Ende wieder auf Anfang setzen
-      resetStoredVideoPosition(video);
+    function restoreVideoPosition(video) {
+      const id = videoId(video);
+      const saved = standbyState.positions[id] || 0;
 
       try {
-        video.currentTime = 0;
-      } catch (e) {}
+        if (!isFinite(saved) || saved <= 0) {
+          video.currentTime = 0;
+          return;
+        }
 
-      if (!standbyCrossfading && video === activeStandbyVideo) {
-        await crossfadeToNextStandbyVideo();
+        if (isFinite(video.duration) && video.duration > 0) {
+          const remaining = video.duration - saved;
+
+          if (remaining <= VIDEO_END_RESET_THRESHOLD) {
+            video.currentTime = 0;
+            standbyState.positions[id] = 0;
+            return;
+          }
+
+          video.currentTime = Math.max(0, Math.min(saved, video.duration - 0.5));
+        } else {
+          video.currentTime = saved;
+        }
+      } catch (e) {
+        try {
+          video.currentTime = 0;
+        } catch (_) {}
       }
-    });
+    }
 
-    video.addEventListener("error", () => {
-      console.error("Standby-Video konnte nicht geladen werden:", video.currentSrc || video.src);
-      markVideoFailed(video);
-    });
+    function setupStandbyVideo(video) {
+      video.addEventListener("loadedmetadata", () => {
+        markVideoReady(video);
+      });
 
-    video.load();
-  }
+      video.addEventListener("canplay", () => {
+        markVideoReady(video);
+      });
 
-  setupStandbyVideo(standbyVideo1);
-  setupStandbyVideo(standbyVideo2);
+      video.addEventListener("timeupdate", () => {
+        rememberVideoPosition(video);
+      });
 
-  async function safePlayVideo(video) {
-    if (!video || isVideoFailed(video)) return false;
+      video.addEventListener("pause", () => {
+        rememberVideoPosition(video);
+      });
 
-    try {
-      const duration = video.duration;
-      const current = video.currentTime;
+      video.addEventListener("ended", async () => {
+        standbyState.positions[video.id] = 0;
 
-      if (isFinite(duration) && duration > 0) {
-        const remaining = duration - current;
-        if (remaining <= VIDEO_END_RESET_THRESHOLD) {
-          resetStoredVideoPosition(video);
+        try {
+          video.currentTime = 0;
+        } catch (e) {}
+
+        if (!standbyCrossfading && video === activeStandbyVideo) {
+          await crossfadeToNextStandbyVideo();
+        }
+      });
+
+      video.addEventListener("error", () => {
+        console.error("Standby-Video konnte nicht geladen werden:", video.currentSrc || video.src);
+        markVideoFailed(video);
+      });
+
+      video.load();
+    }
+
+    setupStandbyVideo(standbyVideo1);
+    setupStandbyVideo(standbyVideo2);
+
+    async function safePlayVideo(video) {
+      if (isVideoFailed(video)) return false;
+
+      try {
+        const duration = video.duration;
+        const current = video.currentTime;
+
+        if (isFinite(duration) && duration > 0 && (duration - current) <= VIDEO_END_RESET_THRESHOLD) {
+          standbyState.positions[video.id] = 0;
           video.currentTime = 0;
         } else {
           restoreVideoPosition(video);
         }
-      } else {
-        restoreVideoPosition(video);
+
+        await video.play();
+        return true;
+      } catch (e) {
+        console.error("Video konnte nicht abgespielt werden:", video.id, e);
+        return false;
       }
-
-      await video.play();
-      return true;
-    } catch (e) {
-      console.error("Video konnte nicht abgespielt werden:", video.id, e);
-      return false;
     }
-  }
 
-  function activateVideo(videoToShow, videoToHide) {
-    if (videoToShow) videoToShow.classList.add("active");
-    if (videoToHide) videoToHide.classList.remove("active");
-  }
-
-  function stopStandbyMonitor() {
-    if (standbyMonitorTimer) {
-      clearInterval(standbyMonitorTimer);
-      standbyMonitorTimer = null;
+    function activateVideo(videoToShow, videoToHide) {
+      videoToShow.classList.add("active");
+      videoToHide.classList.remove("active");
     }
-  }
 
-  function startStandbyMonitor() {
-    stopStandbyMonitor();
+    function stopStandbyMonitor() {
+      if (standbyMonitorTimer) {
+        clearInterval(standbyMonitorTimer);
+        standbyMonitorTimer = null;
+      }
+    }
 
-    standbyMonitorTimer = setInterval(async () => {
+    function startStandbyMonitor() {
+      stopStandbyMonitor();
+
+      standbyMonitorTimer = setInterval(async () => {
+        if (standbyCrossfading) return;
+        if (standbyView.classList.contains("hidden")) return;
+        if (!activeStandbyVideo) return;
+        if (activeStandbyVideo.paused) return;
+        if (!isFinite(activeStandbyVideo.duration) || activeStandbyVideo.duration <= 0) return;
+
+        const remaining = activeStandbyVideo.duration - activeStandbyVideo.currentTime;
+
+        if (remaining <= STANDBY_SWITCH_BUFFER) {
+          await crossfadeToNextStandbyVideo();
+        }
+      }, 200);
+    }
+
+    async function crossfadeToNextStandbyVideo() {
       if (standbyCrossfading) return;
-      if (standbyView.classList.contains("hidden")) return;
-      if (!activeStandbyVideo) return;
-      if (activeStandbyVideo.paused) return;
-      if (!isFinite(activeStandbyVideo.duration) || activeStandbyVideo.duration <= 0) return;
 
-      const remaining = activeStandbyVideo.duration - activeStandbyVideo.currentTime;
+      const oldVideo = activeStandbyVideo;
+      let nextVideo = inactiveStandbyVideo;
 
-      if (remaining <= STANDBY_SWITCH_BUFFER) {
-        await crossfadeToNextStandbyVideo();
+      if (!nextVideo || isVideoFailed(nextVideo)) {
+        nextVideo = oldVideo === standbyVideo1 ? standbyVideo2 : standbyVideo1;
       }
-    }, 200);
-  }
 
-  async function crossfadeToNextStandbyVideo() {
-    if (standbyCrossfading) return;
+      if (!nextVideo || isVideoFailed(nextVideo)) {
+        if (oldVideo) {
+          try {
+            oldVideo.currentTime = 0;
+            standbyState.positions[oldVideo.id] = 0;
+            await oldVideo.play();
+          } catch (e) {}
+        }
+        return;
+      }
 
-    const oldVideo = activeStandbyVideo;
-    let nextVideo = inactiveStandbyVideo;
+      standbyCrossfading = true;
 
-    if (!nextVideo || isVideoFailed(nextVideo)) {
-      nextVideo = oldVideo === standbyVideo1 ? standbyVideo2 : standbyVideo1;
-    }
+      standbyState.positions[oldVideo.id] = 0;
 
-    if (!nextVideo || isVideoFailed(nextVideo)) {
-      if (oldVideo) {
+      const started = await safePlayVideo(nextVideo);
+
+      if (!started) {
+        standbyCrossfading = false;
+        if (oldVideo && !oldVideo.paused) return;
+
         try {
-          resetStoredVideoPosition(oldVideo);
           oldVideo.currentTime = 0;
+          standbyState.positions[oldVideo.id] = 0;
           await oldVideo.play();
         } catch (e) {}
+        return;
       }
-      return;
+
+      activateVideo(nextVideo, oldVideo);
+
+      window.setTimeout(() => {
+        try {
+          oldVideo.pause();
+          oldVideo.currentTime = 0;
+          standbyState.positions[oldVideo.id] = 0;
+        } catch (e) {}
+      }, STANDBY_CROSSFADE_MS);
+
+      activeStandbyVideo = nextVideo;
+      inactiveStandbyVideo = oldVideo;
+
+      window.setTimeout(() => {
+        standbyCrossfading = false;
+      }, STANDBY_CROSSFADE_MS + 50);
     }
 
-    standbyCrossfading = true;
+    async function playStandbyVideo() {
+      updateFallbackState();
 
-    // Das ausblendende Video soll beim nächsten Durchlauf wieder sauber bei 0 starten
-    resetStoredVideoPosition(oldVideo);
-
-    try {
-      oldVideo.pause();
-      oldVideo.currentTime = 0;
-    } catch (e) {}
-
-    const started = await safePlayVideo(nextVideo);
-
-    if (!started) {
       standbyCrossfading = false;
 
-      try {
-        resetStoredVideoPosition(oldVideo);
-        oldVideo.currentTime = 0;
-        await oldVideo.play();
-      } catch (e) {}
+      let preferred = activeStandbyVideo;
+      if (!preferred || isVideoFailed(preferred)) {
+        preferred = !isVideoFailed(standbyVideo1) ? standbyVideo1 : standbyVideo2;
+      }
 
-      return;
-    }
-
-    activateVideo(nextVideo, oldVideo);
-
-    activeStandbyVideo = nextVideo;
-    inactiveStandbyVideo = oldVideo;
-
-    window.setTimeout(() => {
-      try {
-        oldVideo.pause();
-        oldVideo.currentTime = 0;
-      } catch (e) {}
-    }, STANDBY_CROSSFADE_MS);
-
-    window.setTimeout(() => {
-      standbyCrossfading = false;
-    }, STANDBY_CROSSFADE_MS + 50);
-  }
-
-  async function playStandbyVideo() {
-    updateFallbackState();
-    standbyCrossfading = false;
-
-    let preferred = activeStandbyVideo;
-    if (!preferred || isVideoFailed(preferred)) {
-      preferred = !isVideoFailed(standbyVideo1) ? standbyVideo1 : standbyVideo2;
-    }
-
-    if (!preferred || isVideoFailed(preferred)) {
-      standbyFallback.classList.remove("hidden");
-      return;
-    }
-
-    const other = preferred === standbyVideo1 ? standbyVideo2 : standbyVideo1;
-
-    activeStandbyVideo = preferred;
-    inactiveStandbyVideo = other;
-
-    try {
-      other.pause();
-      other.currentTime = 0;
-    } catch (e) {}
-
-    activateVideo(preferred, other);
-
-    const started = await safePlayVideo(preferred);
-
-    if (!started) {
-      const fallbackVideo = other;
-      if (!fallbackVideo || isVideoFailed(fallbackVideo)) {
+      if (!preferred || isVideoFailed(preferred)) {
         standbyFallback.classList.remove("hidden");
         return;
       }
 
-      activeStandbyVideo = fallbackVideo;
-      inactiveStandbyVideo = preferred;
-      activateVideo(fallbackVideo, preferred);
+      const other = preferred === standbyVideo1 ? standbyVideo2 : standbyVideo1;
 
-      const fallbackStarted = await safePlayVideo(fallbackVideo);
-      if (!fallbackStarted) {
-        standbyFallback.classList.remove("hidden");
-        return;
+      activeStandbyVideo = preferred;
+      inactiveStandbyVideo = other;
+
+      try {
+        other.pause();
+        other.currentTime = 0;
+      } catch (e) {}
+
+      activateVideo(preferred, other);
+
+      const started = await safePlayVideo(preferred);
+
+      if (!started) {
+        const fallbackVideo = other;
+        if (!fallbackVideo || isVideoFailed(fallbackVideo)) {
+          standbyFallback.classList.remove("hidden");
+          return;
+        }
+
+        activeStandbyVideo = fallbackVideo;
+        inactiveStandbyVideo = preferred;
+        activateVideo(fallbackVideo, preferred);
+
+        const fallbackStarted = await safePlayVideo(fallbackVideo);
+        if (!fallbackStarted) {
+          standbyFallback.classList.remove("hidden");
+          return;
+        }
       }
+
+      standbyFallback.classList.add("hidden");
+      startStandbyMonitor();
     }
 
-    standbyFallback.classList.add("hidden");
-    startStandbyMonitor();
-  }
+    function pauseStandbyVideos() {
+      stopStandbyMonitor();
 
-  function pauseStandbyVideos() {
-    stopStandbyMonitor();
+      [standbyVideo1, standbyVideo2].forEach(video => {
+        try {
+          rememberVideoPosition(video);
+          video.pause();
+        } catch (e) {}
+      });
+    }
 
-    [standbyVideo1, standbyVideo2].forEach(video => {
-      try {
-        rememberVideoPosition(video);
-        video.pause();
-      } catch (e) {}
-    });
-  }
+    function setMsg(text, type = "ok") {
+      msg.className = `msg show ${type}`;
+      msg.textContent = text;
+    }
 
-  function setMsg(text, type = "ok") {
-    msg.className = `msg show ${type}`;
-    msg.textContent = text;
-  }
+    function clearMsg() {
+      msg.className = "msg";
+      msg.textContent = "";
+    }
 
-  function clearMsg() {
-    msg.className = "msg";
-    msg.textContent = "";
-  }
+    function showSendingPopup(title = "Auftrag wird verschickt", text = "Bitte einen kurzen Moment warten …") {
+      popupTitle.textContent = title;
+      popupText.textContent = text;
+      sendPopup.classList.remove("success");
+      sendPopup.classList.add("show");
+    }
 
-  function showSendingPopup(title = "Auftrag wird verschickt", text = "Bitte einen kurzen Moment warten …") {
-    popupTitle.textContent = title;
-    popupText.textContent = text;
-    sendPopup.classList.remove("success");
-    sendPopup.classList.add("show");
-  }
+    function showSuccessPopup(title = "Erfolgreich verschickt", text = "Der Auftrag wurde erfolgreich per E-Mail versendet.") {
+      popupTitle.textContent = title;
+      popupText.textContent = text;
+      sendPopup.classList.add("show");
+      sendPopup.classList.add("success");
+    }
 
-  function showSuccessPopup(title = "Erfolgreich verschickt", text = "Der Auftrag wurde erfolgreich per E-Mail versendet.") {
-    popupTitle.textContent = title;
-    popupText.textContent = text;
-    sendPopup.classList.add("show");
-    sendPopup.classList.add("success");
-  }
+    function hidePopup() {
+      sendPopup.classList.remove("show");
+      sendPopup.classList.remove("success");
+    }
 
-  function hidePopup() {
-    sendPopup.classList.remove("show");
-    sendPopup.classList.remove("success");
-  }
+    function isSignMode() {
+      return currentMode === "mode1" || currentMode === "mode3";
+    }
 
-  function isSignMode() {
-    return currentMode === "mode1" || currentMode === "mode3";
-  }
+    function sessionKey(session, mode) {
+      if (!session) return "";
+      return JSON.stringify({
+        mode,
+        name: session.name || "",
+        email: session.email || "",
+        phone: session.phone || "",
+        plate: session.plate || "",
+        reason: session.reason || ""
+      });
+    }
 
-  function sessionKey(session, mode) {
-    if (!session) return "";
-    return JSON.stringify({
-      mode,
-      name: session.name || "",
-      email: session.email || "",
-      phone: session.phone || "",
-      plate: session.plate || "",
-      reason: session.reason || ""
-    });
-  }
+    function getDocumentKey(file, version) {
+      return `${file || ""}::${version || ""}`;
+    }
 
-  function getDocumentKey(file, version) {
-    return `${file || ""}::${version || ""}`;
-  }
+    function broadcast(type, payload = {}) {
+      if (Date.now() < suppressBroadcastUntil) return;
+      channel.postMessage({
+        type,
+        screen,
+        ...payload
+      });
+    }
 
-  function broadcast(type, payload = {}) {
-    if (Date.now() < suppressBroadcastUntil) return;
-    channel.postMessage({
-      type,
-      screen,
-      ...payload
-    });
-  }
+    function showStandby() {
+      clearTimeout(fadeTimeout);
 
-  function showStandby() {
-    clearTimeout(fadeTimeout);
-
-    standbyView.classList.remove("hidden");
-    standbyView.classList.remove("fade-out");
-    liveView.classList.add("hidden");
-    liveView.classList.remove("fade-in");
-    subtitleText.textContent = "Standby";
-
-    currentPdfUrl = null;
-    currentVersion = null;
-    currentMode = null;
-    currentSessionKey = null;
-    pdfDoc = null;
-    currentPage = 1;
-    pageStates = [];
-    pageFrame.innerHTML = '<div class="loading">Dokument wird geladen …</div>';
-
-    nameInput.value = "";
-    emailInput.value = "";
-    phoneInput.value = "";
-    plateInput.value = "";
-    name3Input.value = "";
-    plate3Input.value = "";
-    reasonInput.value = "";
-
-    clearMsg();
-    hidePopup();
-    updatePageIndicator();
-    playStandbyVideo();
-  }
-
-  function showLive() {
-    clearTimeout(fadeTimeout);
-
-    liveView.classList.remove("hidden");
-    liveView.classList.add("fade-in");
-    standbyView.classList.remove("hidden");
-    standbyView.classList.add("fade-out");
-    subtitleText.textContent = "Dokument geöffnet";
-
-    fadeTimeout = setTimeout(() => {
-      standbyView.classList.add("hidden");
-      liveView.classList.remove("fade-in");
+      standbyView.classList.remove("hidden");
       standbyView.classList.remove("fade-out");
-      pauseStandbyVideos();
-    }, 450);
-  }
+      liveView.classList.add("hidden");
+      liveView.classList.remove("fade-in");
+      subtitleText.textContent = "Standby";
 
-  // ... ab hier deinen restlichen bestehenden Code unverändert weiterlaufen lassen ...
-</script>
+      currentPdfUrl = null;
+      currentVersion = null;
+      currentMode = null;
+      currentSessionKey = null;
+      pdfDoc = null;
+      currentPage = 1;
+      pageStates = [];
+      pageFrame.innerHTML = '<div class="loading">Dokument wird geladen …</div>';
+
+      nameInput.value = "";
+      emailInput.value = "";
+      phoneInput.value = "";
+      plateInput.value = "";
+      name3Input.value = "";
+      plate3Input.value = "";
+      reasonInput.value = "";
+
+      clearMsg();
+      hidePopup();
+      updatePageIndicator();
+      playStandbyVideo();
+    }
+
+    function showLive() {
+      clearTimeout(fadeTimeout);
+
+      liveView.classList.remove("hidden");
+      liveView.classList.add("fade-in");
+      standbyView.classList.remove("hidden");
+      standbyView.classList.add("fade-out");
+      subtitleText.textContent = "Dokument geöffnet";
+
+      fadeTimeout = setTimeout(() => {
+        standbyView.classList.add("hidden");
+        liveView.classList.remove("fade-in");
+        standbyView.classList.remove("fade-out");
+        pauseStandbyVideos();
+      }, 450);
+    }
+
+    function applyMode(mode, session) {
+      currentMode = mode;
+      currentSessionKey = sessionKey(session, mode);
+
+      mode1Fields.classList.add("hidden");
+      mode3Fields.classList.add("hidden");
+      mode2Info.classList.add("hidden");
+      signActions.classList.add("hidden");
+      viewActions.classList.add("hidden");
+
+      nameInput.value = "";
+      emailInput.value = "";
+      phoneInput.value = "";
+      plateInput.value = "";
+      name3Input.value = "";
+      plate3Input.value = "";
+      reasonInput.value = "";
+
+      if (mode === "mode1") {
+        mode1Fields.classList.remove("hidden");
+        signActions.classList.remove("hidden");
+        modeHint.textContent = "Bitte prüfen Sie das Dokument und unterschreiben Sie auf den Seiten.";
+
+        nameInput.value = session?.name || "";
+        emailInput.value = session?.email || "";
+        phoneInput.value = session?.phone || "";
+        plateInput.value = session?.plate || "";
+      } else if (mode === "mode3") {
+        mode3Fields.classList.remove("hidden");
+        signActions.classList.remove("hidden");
+        modeHint.textContent = "Bitte prüfen Sie das Dokument und unterschreiben Sie auf den Seiten.";
+
+        name3Input.value = session?.name || "";
+        plate3Input.value = session?.plate || "";
+        reasonInput.value = session?.reason || "";
+      } else {
+        mode2Info.classList.remove("hidden");
+        viewActions.classList.remove("hidden");
+        modeHint.textContent = "Bitte prüfen Sie das Dokument.";
+      }
+    }
+
+    function updatePageIndicator() {
+      const total = pdfDoc ? pdfDoc.numPages : 1;
+      pageIndicator.textContent = `Seite ${currentPage} / ${total}`;
+      prevBtn.disabled = currentPage <= 1;
+      nextBtn.disabled = currentPage >= total;
+    }
+
+    function createBlankCanvas(width, height) {
+      const c = document.createElement("canvas");
+      c.width = width;
+      c.height = height;
+      return c;
+    }
+
+    function getPageState(index) {
+      return pageStates[index] || null;
+    }
+
+    function applyOverlayToPage(pageIndex, imageDataUrl) {
+      const state = getPageState(pageIndex);
+      if (!state || !state.overlayCanvas || !imageDataUrl) return;
+
+      const img = new Image();
+      img.onload = () => {
+        const overlayCtx = state.overlayCanvas.getContext("2d");
+        overlayCtx.clearRect(0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
+        overlayCtx.drawImage(img, 0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
+
+        const drawCanvas = pageFrame.querySelector(".draw-canvas");
+        if (drawCanvas && currentPage - 1 === pageIndex) {
+          const drawCtx = drawCanvas.getContext("2d");
+          drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+          drawCtx.drawImage(state.overlayCanvas, 0, 0);
+        }
+      };
+      img.src = imageDataUrl;
+    }
+
+    function broadcastOverlay(pageIndex) {
+      if (!isSignMode()) return;
+      const state = getPageState(pageIndex);
+      if (!state || !state.overlayCanvas) return;
+
+      broadcast("overlay-update", {
+        documentKey: getDocumentKey(currentPdfUrl, currentVersion),
+        mode: currentMode,
+        pageIndex,
+        image: state.overlayCanvas.toDataURL("image/png")
+      });
+    }
+
+    function broadcastClear(pageIndex) {
+      broadcast("overlay-clear", {
+        documentKey: getDocumentKey(currentPdfUrl, currentVersion),
+        pageIndex
+      });
+    }
+
+    function setupDrawing(drawCanvas, overlayCanvas, pageIndex) {
+      const drawCtx = drawCanvas.getContext("2d");
+      drawCtx.lineCap = "round";
+      drawCtx.lineJoin = "round";
+      drawCtx.lineWidth = 2.8;
+      drawCtx.strokeStyle = "#111827";
+      drawCtx.drawImage(overlayCanvas, 0, 0);
+
+      let drawing = false;
+
+      function getPos(event) {
+        const rect = drawCanvas.getBoundingClientRect();
+        const touch = event.touches && event.touches[0];
+        const clientX = touch ? touch.clientX : event.clientX;
+        const clientY = touch ? touch.clientY : event.clientY;
+
+        const scaleX = drawCanvas.width / rect.width;
+        const scaleY = drawCanvas.height / rect.height;
+
+        return {
+          x: (clientX - rect.left) * scaleX,
+          y: (clientY - rect.top) * scaleY
+        };
+      }
+
+      function persistAndBroadcast() {
+        const overlayCtx = overlayCanvas.getContext("2d");
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        overlayCtx.drawImage(drawCanvas, 0, 0);
+
+        if (!applyingRemoteOverlay) {
+          broadcastOverlay(pageIndex);
+        }
+      }
+
+      function start(event) {
+        event.preventDefault();
+        drawing = true;
+        const p = getPos(event);
+        drawCtx.beginPath();
+        drawCtx.moveTo(p.x, p.y);
+      }
+
+      function move(event) {
+        if (!drawing) return;
+        event.preventDefault();
+        const p = getPos(event);
+        drawCtx.lineTo(p.x, p.y);
+        drawCtx.stroke();
+        persistAndBroadcast();
+      }
+
+      function end(event) {
+        if (!drawing) return;
+        event.preventDefault();
+        drawing = false;
+        persistAndBroadcast();
+      }
+
+      drawCanvas.addEventListener("mousedown", start);
+      drawCanvas.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", end);
+
+      drawCanvas.addEventListener("touchstart", start, { passive: false });
+      drawCanvas.addEventListener("touchmove", move, { passive: false });
+      window.addEventListener("touchend", end, { passive: false });
+      window.addEventListener("touchcancel", end, { passive: false });
+
+      return {
+        clear() {
+          drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+          const overlayCtx = overlayCanvas.getContext("2d");
+          overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+          if (!applyingRemoteOverlay) {
+            broadcastClear(pageIndex);
+          }
+        }
+      };
+    }
+
+    async function renderCurrentPage() {
+      if (!pdfDoc) return;
+
+      const token = ++renderToken;
+      pageFrame.innerHTML = '<div class="loading">Seite wird geladen …</div>';
+      updatePageIndicator();
+
+      const page = await pdfDoc.getPage(currentPage);
+      if (token !== renderToken) return;
+
+      const frameRect = pageFrame.getBoundingClientRect();
+      const maxWidth = Math.max(200, frameRect.width - 10);
+      const maxHeight = Math.max(200, frameRect.height - 10);
+
+      const baseViewport = page.getViewport({ scale: 1 });
+      const scale = Math.min(maxWidth / baseViewport.width, maxHeight / baseViewport.height);
+      const viewport = page.getViewport({ scale });
+
+      const pdfCanvas = document.createElement("canvas");
+      pdfCanvas.className = "pdf-canvas";
+      pdfCanvas.width = viewport.width;
+      pdfCanvas.height = viewport.height;
+
+      const pdfCtx = pdfCanvas.getContext("2d");
+      await page.render({ canvasContext: pdfCtx, viewport }).promise;
+      if (token !== renderToken) return;
+
+      const index = currentPage - 1;
+      const existing = pageStates[index];
+
+      let overlayCanvas;
+      if (existing && existing.overlayCanvas) {
+        overlayCanvas = createBlankCanvas(viewport.width, viewport.height);
+        overlayCanvas.getContext("2d").drawImage(
+          existing.overlayCanvas,
+          0, 0, existing.overlayCanvas.width, existing.overlayCanvas.height,
+          0, 0, viewport.width, viewport.height
+        );
+      } else {
+        overlayCanvas = createBlankCanvas(viewport.width, viewport.height);
+      }
+
+      pageStates[index] = {
+        pdfCanvas,
+        overlayCanvas
+      };
+
+      const wrap = document.createElement("div");
+      wrap.className = "page-canvas-wrap";
+      wrap.style.width = viewport.width + "px";
+      wrap.style.height = viewport.height + "px";
+      wrap.appendChild(pdfCanvas);
+
+      let drawCanvas = null;
+
+      if (isSignMode()) {
+        drawCanvas = document.createElement("canvas");
+        drawCanvas.className = "draw-canvas";
+        drawCanvas.width = viewport.width;
+        drawCanvas.height = viewport.height;
+        drawCanvas.style.width = viewport.width + "px";
+        drawCanvas.style.height = viewport.height + "px";
+        wrap.appendChild(drawCanvas);
+      }
+
+      pageFrame.innerHTML = "";
+      pageFrame.appendChild(wrap);
+
+      if (drawCanvas) {
+        const tools = setupDrawing(drawCanvas, overlayCanvas, index);
+        drawCanvas._clearOverlay = tools.clear;
+      }
+
+      updatePageIndicator();
+    }
+
+    async function loadPdf(fileUrl) {
+      const loadingTask = pdfjsLib.getDocument({
+        url: fileUrl,
+        disableAutoFetch: false,
+        disableStream: false,
+        disableRange: false
+      });
+
+      pdfDoc = await loadingTask.promise;
+      currentPage = 1;
+      pageStates = new Array(pdfDoc.numPages).fill(null);
+      await renderCurrentPage();
+    }
+
+    async function openDocumentState(data, forceRender = false) {
+      if (!data || data.status !== "ok" || !data.file) {
+        showStandby();
+        return;
+      }
+
+      const incomingSessionKey = sessionKey(data.session || null, data.mode);
+      const docChanged = currentPdfUrl !== data.file || currentVersion !== data.version;
+      const modeChanged = currentMode !== data.mode;
+      const sessionChanged = currentSessionKey !== incomingSessionKey;
+
+      if (docChanged || forceRender) {
+        currentPdfUrl = data.file;
+        currentVersion = data.version;
+        showLive();
+        applyMode(data.mode, data.session || null);
+        await loadPdf(`${data.file}?v=${data.version}`);
+        return;
+      }
+
+      if (modeChanged || sessionChanged) {
+        applyMode(data.mode, data.session || null);
+        if (pdfDoc && modeChanged) {
+          await renderCurrentPage();
+        }
+      }
+    }
+
+    async function goPrev() {
+      if (!pdfDoc || currentPage <= 1) return;
+      currentPage--;
+      await renderCurrentPage();
+    }
+
+    async function goNext() {
+      if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
+      currentPage++;
+      await renderCurrentPage();
+    }
+
+    function clearCurrentPage() {
+      if (!isSignMode()) return;
+      const drawCanvas = pageFrame.querySelector(".draw-canvas");
+      if (drawCanvas && typeof drawCanvas._clearOverlay === "function") {
+        drawCanvas._clearOverlay();
+      }
+    }
+
+    function buildOverlaysPayload() {
+      const result = [];
+
+      if (!isSignMode()) {
+        return result;
+      }
+
+      for (let i = 0; i < pageStates.length; i++) {
+        const state = pageStates[i];
+        if (!state || !state.overlayCanvas) continue;
+
+        result.push({
+          pageIndex: i,
+          image: state.overlayCanvas.toDataURL("image/png")
+        });
+      }
+
+      return result;
+    }
+
+    async function submitSignedDocument() {
+      try {
+        clearMsg();
+
+        if (!isSignMode()) {
+          setMsg("Dieses Dokument ist nur zum Anzeigen gedacht.", "err");
+          return;
+        }
+
+        const overlays = buildOverlaysPayload();
+        showSendingPopup("Auftrag wird verschickt", "Bitte einen kurzen Moment warten …");
+
+        const res = await fetch(`/api/sign?screen=${screen}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ overlays })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          hidePopup();
+          throw new Error(data.error || "Dokument konnte nicht bestätigt werden.");
+        }
+
+        showSuccessPopup("Erfolgreich verschickt", "Der Auftrag wurde erfolgreich per E-Mail versendet.");
+        setMsg("Dokument wurde erfolgreich bestätigt.", "ok");
+
+        broadcast("document-signed", {
+          documentKey: getDocumentKey(currentPdfUrl, currentVersion)
+        });
+
+        setTimeout(() => {
+          hidePopup();
+          showStandby();
+        }, 1800);
+      } catch (error) {
+        hidePopup();
+        setMsg(error.message || "Fehler beim Bestätigen.", "err");
+      }
+    }
+
+    async function closeDocument() {
+      try {
+        clearMsg();
+
+        const res = await fetch(`/api/close?screen=${screen}`, {
+          method: "POST"
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "Dokument konnte nicht geschlossen werden.");
+        }
+
+        broadcast("document-closed", {
+          documentKey: getDocumentKey(currentPdfUrl, currentVersion)
+        });
+
+        showStandby();
+      } catch (error) {
+        setMsg(error.message || "Fehler beim Schließen.", "err");
+      }
+    }
+
+    function pausePolling(ms = 2500) {
+      pollPausedUntil = Date.now() + ms;
+    }
+
+    function shouldSkipPoll() {
+      return Date.now() < pollPausedUntil;
+    }
+
+    async function fetchDocumentState() {
+      const res = await fetch(`/api/document?screen=${screen}`, {
+        cache: "no-store"
+      });
+      return await res.json();
+    }
+
+    async function syncFromServer(forceRender = false) {
+      const data = await fetchDocumentState();
+
+      if (data.status !== "ok" || !data.file) {
+        if (currentPdfUrl !== null || forceRender) {
+          showStandby();
+        }
+        return;
+      }
+
+      await openDocumentState(data, forceRender);
+    }
+
+    async function pollDocument(force = false) {
+      try {
+        if (!force && shouldSkipPoll()) {
+          return;
+        }
+        await syncFromServer(false);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    function startPolling() {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+      }
+      pollTimer = setInterval(() => {
+        pollDocument(false);
+      }, 2000);
+    }
+
+    window.addEventListener("message", async (event) => {
+      if (event.origin !== window.location.origin) return;
+
+      const data = event.data || {};
+      if (data.screen && String(data.screen) !== screen) return;
+
+      if (data.type === "kiosk-force-close") {
+        pausePolling(1200);
+        showStandby();
+        return;
+      }
+
+      if (data.type === "kiosk-open-document") {
+        pausePolling(1500);
+        if (data.document) {
+          await openDocumentState(data.document, true);
+        } else {
+          await pollDocument(true);
+        }
+        return;
+      }
+
+      if (data.type === "kiosk-status-update") {
+        pausePolling(1200);
+        await pollDocument(true);
+      }
+    });
+
+    channel.onmessage = async (event) => {
+      const data = event.data || {};
+      if (String(data.screen) !== screen) return;
+
+      if (data.type === "overlay-update") {
+        if (data.documentKey !== getDocumentKey(currentPdfUrl, currentVersion)) return;
+        applyingRemoteOverlay = true;
+        suppressBroadcastUntil = Date.now() + 300;
+        applyOverlayToPage(data.pageIndex, data.image);
+        setTimeout(() => {
+          applyingRemoteOverlay = false;
+        }, 50);
+        return;
+      }
+
+      if (data.type === "overlay-clear") {
+        if (data.documentKey !== getDocumentKey(currentPdfUrl, currentVersion)) return;
+        const state = getPageState(data.pageIndex);
+        if (state && state.overlayCanvas) {
+          const ctx = state.overlayCanvas.getContext("2d");
+          ctx.clearRect(0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
+        }
+        const drawCanvas = pageFrame.querySelector(".draw-canvas");
+        if (drawCanvas && currentPage - 1 === data.pageIndex) {
+          const drawCtx = drawCanvas.getContext("2d");
+          drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+        }
+        return;
+      }
+
+      if (data.type === "document-closed") {
+        if (data.documentKey && data.documentKey !== getDocumentKey(currentPdfUrl, currentVersion)) return;
+        showStandby();
+        return;
+      }
+
+      if (data.type === "document-signed") {
+        if (data.documentKey && data.documentKey !== getDocumentKey(currentPdfUrl, currentVersion)) return;
+        setTimeout(() => {
+          showStandby();
+        }, 1000);
+      }
+    };
+
+    document.getElementById("clearPageBtn").addEventListener("click", clearCurrentPage);
+    document.getElementById("submitBtn").addEventListener("click", submitSignedDocument);
+    document.getElementById("closeBtn").addEventListener("click", closeDocument);
+    prevBtn.addEventListener("click", goPrev);
+    nextBtn.addEventListener("click", goNext);
+
+    let touchStartX = null;
+    let touchStartY = null;
+
+    pageFrame.addEventListener("touchstart", (e) => {
+      if (!e.touches || !e.touches[0]) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    pageFrame.addEventListener("touchend", async (e) => {
+      if (touchStartX === null || touchStartY === null) return;
+
+      const touch = e.changedTouches && e.changedTouches[0];
+      if (!touch) return;
+
+      const dx = touch.clientX - touchStartX;
+      const dy = touch.clientY - touchStartY;
+
+      touchStartX = null;
+      touchStartY = null;
+
+      if (Math.abs(dx) > 90 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        if (dx < 0) {
+          await goNext();
+        } else {
+          await goPrev();
+        }
+      }
+    }, { passive: true });
+
+    window.addEventListener("resize", () => {
+      if (pdfDoc) {
+        renderCurrentPage().catch(console.error);
+      }
+    });
+
+    showStandby();
+    pollDocument(true);
+    startPolling();
+  </script>
+</body>
+</html>
