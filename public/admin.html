@@ -605,6 +605,11 @@
       return data;
     }
 
+    async function getDocumentState(screen = currentScreen()) {
+      const res = await fetch(`/api/document?screen=${screen}`, { cache: "no-store" });
+      return await res.json();
+    }
+
     function loadPreview(force = false) {
       const screen = currentScreen();
       const src = `/kiosk.html?screen=${screen}`;
@@ -683,12 +688,24 @@
         await saveSession();
         await uploadPdf();
         document.getElementById("file").value = "";
+
+        const docState = await getDocumentState(currentScreen());
+
         lastStatusKey = "";
         await loadStatus();
-        sendPreviewMessage("kiosk-status-update", {
-          screen: currentScreen(),
-          status: { active: true }
-        });
+
+        if (docState && docState.status === "ok" && docState.file) {
+          sendPreviewMessage("kiosk-open-document", {
+            screen: currentScreen(),
+            document: docState
+          });
+        } else {
+          sendPreviewMessage("kiosk-status-update", {
+            screen: currentScreen(),
+            status: { active: true }
+          });
+        }
+
         setMessage("PDF wurde erfolgreich hochgeladen.", "ok");
       } catch (err) {
         setMessage(err.message || "Fehler beim Hochladen.", "err");
