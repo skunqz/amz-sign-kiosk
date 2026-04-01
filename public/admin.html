@@ -467,6 +467,8 @@
     const preview = document.getElementById("preview");
 
     let selectedMode = "mode1";
+    let previewScreenLoaded = null;
+    let lastStatusKey = "";
 
     function getQueryScreen() {
       const url = new URL(window.location.href);
@@ -603,41 +605,79 @@
       return data;
     }
 
-    function refreshPreview() {
+    function loadPreview(force = false) {
       const screen = currentScreen();
-      preview.src = `/kiosk.html?screen=${screen}&t=${Date.now()}`;
-      document.getElementById("kioskLink").href = `/kiosk.html?screen=${screen}`;
+      const src = `/kiosk.html?screen=${screen}`;
+      document.getElementById("kioskLink").href = src;
+
+      if (force || previewScreenLoaded !== screen) {
+        preview.src = src;
+        previewScreenLoaded = screen;
+      }
+    }
+
+    function sendPreviewMessage(type, payload = {}) {
+      if (!preview.contentWindow) return;
+      preview.contentWindow.postMessage({ type, ...payload }, window.location.origin);
+    }
+
+    function syncPreviewState(status) {
+      sendPreviewMessage("kiosk-status-update", {
+        status
+      });
+    }
+
+    function buildStatusKey(status) {
+      return JSON.stringify({
+        active: !!status.active,
+        mode: status.mode || "",
+        filename: status.filename || "",
+        name: status.name || "",
+        lastSignedName: status.lastSignedName || "",
+        lastSignedAt: status.lastSignedAt || ""
+      });
     }
 
     async function loadStatus() {
-      clearMessage();
-      document.getElementById("infoScreen").textContent = `Screen ${currentScreen()}`;
-      refreshPreview();
+      try {
+        document.getElementById("infoScreen").textContent = `Screen ${currentScreen()}`;
+        loadPreview(false);
 
-      const [statusRes, sessionRes] = await Promise.all([
-        fetch(`/api/status?screen=${currentScreen()}`),
-        fetch(`/api/session?screen=${currentScreen()}`)
-      ]);
+        const [statusRes, sessionRes] = await Promise.all([
+          fetch(`/api/status?screen=${currentScreen()}`),
+          fetch(`/api/session?screen=${currentScreen()}`)
+        ]);
 
-      if (statusRes.status === 401 || sessionRes.status === 401) {
-        window.location.href = "/admin";
-        return;
+        if (statusRes.status === 401 || sessionRes.status === 401) {
+          window.location.href = "/admin";
+          return;
+        }
+
+        const status = await statusRes.json();
+        const sessionData = await sessionRes.json();
+
+        fillSession(sessionData.session || null);
+
+        document.getElementById("statusDot").className = `dot ${status.active ? "live" : "off"}`;
+        document.getElementById("statusText").textContent = status.active ? "Aktiv" : "Inaktiv";
+        document.getElementById("infoMode").textContent = modeLabel(status.mode);
+        document.getElementById("infoFile").textContent = status.filename || "-";
+        document.getElementById("infoName").textContent = status.name || "-";
+        document.getElementById("infoLastSignedName").textContent = status.lastSignedName || "-";
+        document.getElementById("infoLastSignedAt").textContent = status.lastSignedAt
+          ? new Date(status.lastSignedAt).toLocaleString("de-DE")
+          : "-";
+
+        const newKey = buildStatusKey(status);
+
+        if (lastStatusKey && lastStatusKey !== newKey) {
+          syncPreviewState(status);
+        }
+
+        lastStatusKey = newKey;
+      } catch (err) {
+        console.error("Status konnte nicht geladen werden:", err);
       }
-
-      const status = await statusRes.json();
-      const sessionData = await sessionRes.json();
-
-      fillSession(sessionData.session || null);
-
-      document.getElementById("statusDot").className = `dot ${status.active ? "live" : "off"}`;
-      document.getElementById("statusText").textContent = status.active ? "Aktiv" : "Inaktiv";
-      document.getElementById("infoMode").textContent = modeLabel(status.mode);
-      document.getElementById("infoFile").textContent = status.filename || "-";
-      document.getElementById("infoName").textContent = status.name || "-";
-      document.getElementById("infoLastSignedName").textContent = status.lastSignedName || "-";
-      document.getElementById("infoLastSignedAt").textContent = status.lastSignedAt
-        ? new Date(status.lastSignedAt).toLocaleString("de-DE")
-        : "-";
     }
 
     async function uploadAll() {
@@ -646,8 +686,9 @@
         await saveSession();
         await uploadPdf();
         document.getElementById("file").value = "";
+        loadPreview(true);
+        lastStatusKey = "";
         await loadStatus();
-        refreshPreview();
         setMessage("PDF wurde erfolgreich hochgeladen.", "ok");
       } catch (err) {
         setMessage(err.message || "Fehler beim Hochladen.", "err");
@@ -668,8 +709,9 @@
           throw new Error(data.error || "PDF konnte nicht geschlossen werden.");
         }
 
+        sendPreviewMessage("kiosk-force-close", { screen: currentScreen() });
+        lastStatusKey = "";
         await loadStatus();
-        refreshPreview();
         setMessage("PDF wurde geschlossen.", "ok");
       } catch (err) {
         setMessage(err.message || "Fehler beim Schließen.", "err");
@@ -690,11 +732,22 @@
     });
 
     screenSelect.addEventListener("change", async () => {
+      previewScreenLoaded = null;
+      lastStatusKey = "";
+      loadPreview(true);
       await loadStatus();
+    });
+
+    preview.addEventListener("load", () => {
+      lastStatusKey = "";
+      setTimeout(() => {
+        loadStatus();
+      }, 200);
     });
 
     screenSelect.value = getQueryScreen();
     applyMode("mode1");
+    loadPreview(true);
     loadStatus();
     setInterval(loadStatus, 3000);
   </script>
