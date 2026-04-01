@@ -105,6 +105,13 @@
       align-items:center;
       justify-content:center;
       overflow:hidden;
+      opacity:1;
+      transition:opacity .45s ease;
+      z-index:5;
+    }
+
+    .standby.fade-out{
+      opacity:0;
     }
 
     .standby-card{
@@ -123,14 +130,25 @@
       align-items:center;
       justify-content:center;
       background:#000;
+      position:relative;
+      overflow:hidden;
     }
 
-    .standby-logo{
+    .standby-video{
+      position:absolute;
+      inset:0;
       width:100%;
       height:100%;
-      object-fit:contain;
+      object-fit:cover;
       background:#000;
       display:block;
+      opacity:0;
+      transition:opacity 1.2s ease;
+      pointer-events:none;
+    }
+
+    .standby-video.active{
+      opacity:1;
     }
 
     .standby-fallback{
@@ -144,6 +162,9 @@
       font-size:120px;
       font-weight:800;
       letter-spacing:2px;
+      position:absolute;
+      inset:0;
+      z-index:3;
     }
 
     .live{
@@ -153,6 +174,18 @@
       flex-direction:column;
       min-height:0;
       background:#000;
+      opacity:1;
+      transition:opacity .45s ease;
+      z-index:10;
+    }
+
+    .live.fade-in{
+      animation:liveFadeIn .45s ease;
+    }
+
+    @keyframes liveFadeIn{
+      from{ opacity:0; }
+      to{ opacity:1; }
     }
 
     .doc-stage{
@@ -503,8 +536,28 @@
     <div id="standbyView" class="standby">
       <div class="standby-card">
         <div class="standby-logo-wrap">
-          <img id="standbyLogo" class="standby-logo hidden" alt="Logo" />
-          <div id="standbyFallback" class="standby-fallback">LOGO</div>
+          <video
+            id="standbyVideo1"
+            class="standby-video active"
+            autoplay
+            muted
+            playsinline
+            preload="auto"
+          >
+            <source src="/amz-mov.mp4" type="video/mp4" />
+          </video>
+
+          <video
+            id="standbyVideo2"
+            class="standby-video"
+            muted
+            playsinline
+            preload="auto"
+          >
+            <source src="/amz-mov2.mp4" type="video/mp4" />
+          </video>
+
+          <div id="standbyFallback" class="standby-fallback hidden">VIDEO</div>
         </div>
       </div>
     </div>
@@ -592,7 +645,6 @@
     import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
     pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
-    const STANDBY_LOGO = "/logo-portrait.png";
     const channel = new BroadcastChannel("amz-kiosk-sync");
 
     const url = new URL(window.location.href);
@@ -604,7 +656,8 @@
     const subtitleText = document.getElementById("subtitleText");
     const screenBadge = document.getElementById("screenBadge");
 
-    const standbyLogo = document.getElementById("standbyLogo");
+    const standbyVideo1 = document.getElementById("standbyVideo1");
+    const standbyVideo2 = document.getElementById("standbyVideo2");
     const standbyFallback = document.getElementById("standbyFallback");
 
     const pageFrame = document.getElementById("pageFrame");
@@ -647,21 +700,121 @@
     let pollPausedUntil = 0;
     let applyingRemoteOverlay = false;
     let suppressBroadcastUntil = 0;
+    let fadeTimeout = null;
+
+    let activeStandbyVideo = standbyVideo1;
+    let inactiveStandbyVideo = standbyVideo2;
+    let standbyCrossfading = false;
+    const STANDBY_CROSSFADE_MS = 1200;
+    const STANDBY_SWITCH_BUFFER = 1.4;
+    let standbyMonitorTimer = null;
 
     titleText.textContent = `Kiosk – Screen ${screen}`;
     screenBadge.textContent = `Screen ${screen}`;
 
-    const logoTest = new Image();
-    logoTest.onload = () => {
-      standbyLogo.src = STANDBY_LOGO;
-      standbyLogo.classList.remove("hidden");
+    function setupVideoFallback(video) {
+      video.addEventListener("error", () => {
+        standbyFallback.classList.remove("hidden");
+      });
+    }
+
+    setupVideoFallback(standbyVideo1);
+    setupVideoFallback(standbyVideo2);
+
+    function startStandbyMonitor() {
+      stopStandbyMonitor();
+      standbyMonitorTimer = setInterval(() => {
+        if (standbyCrossfading) return;
+        if (standbyView.classList.contains("hidden")) return;
+
+        const v = activeStandbyVideo;
+        if (!v || !isFinite(v.duration) || v.duration <= 0) return;
+        if (v.paused) return;
+
+        const remaining = v.duration - v.currentTime;
+        if (remaining <= STANDBY_SWITCH_BUFFER) {
+          crossfadeToNextStandbyVideo();
+        }
+      }, 200);
+    }
+
+    function stopStandbyMonitor() {
+      if (standbyMonitorTimer) {
+        clearInterval(standbyMonitorTimer);
+        standbyMonitorTimer = null;
+      }
+    }
+
+    async function crossfadeToNextStandbyVideo() {
+      if (standbyCrossfading) return;
+      standbyCrossfading = true;
+
+      const oldVideo = activeStandbyVideo;
+      const nextVideo = inactiveStandbyVideo;
+
+      try {
+        nextVideo.currentTime = 0;
+        await nextVideo.play();
+
+        nextVideo.classList.add("active");
+        oldVideo.classList.remove("active");
+
+        window.setTimeout(() => {
+          try {
+            oldVideo.pause();
+            oldVideo.currentTime = 0;
+          } catch (e) {}
+        }, STANDBY_CROSSFADE_MS + 50);
+
+        inactiveStandbyVideo = oldVideo;
+        activeStandbyVideo = nextVideo;
+      } catch (e) {
+        standbyFallback.classList.remove("hidden");
+      } finally {
+        window.setTimeout(() => {
+          standbyCrossfading = false;
+        }, STANDBY_CROSSFADE_MS);
+      }
+    }
+
+    standbyVideo1.addEventListener("ended", () => {
+      if (!standbyCrossfading) {
+        crossfadeToNextStandbyVideo();
+      }
+    });
+
+    standbyVideo2.addEventListener("ended", () => {
+      if (!standbyCrossfading) {
+        crossfadeToNextStandbyVideo();
+      }
+    });
+
+    function playStandbyVideo() {
       standbyFallback.classList.add("hidden");
-    };
-    logoTest.onerror = () => {
-      standbyLogo.classList.add("hidden");
-      standbyFallback.classList.remove("hidden");
-    };
-    logoTest.src = STANDBY_LOGO;
+      standbyVideo1.classList.add("active");
+      standbyVideo2.classList.remove("active");
+      activeStandbyVideo = standbyVideo1;
+      inactiveStandbyVideo = standbyVideo2;
+      standbyCrossfading = false;
+
+      try {
+        standbyVideo2.pause();
+        standbyVideo2.currentTime = 0;
+      } catch (e) {}
+
+      standbyVideo1.currentTime = 0;
+      standbyVideo1.play().then(() => {
+        startStandbyMonitor();
+      }).catch(() => {
+        standbyFallback.classList.remove("hidden");
+      });
+    }
+
+    function pauseStandbyVideos() {
+      stopStandbyMonitor();
+      try { standbyVideo1.pause(); } catch (e) {}
+      try { standbyVideo2.pause(); } catch (e) {}
+    }
 
     function setMsg(text, type = "ok") {
       msg.className = `msg show ${type}`;
@@ -722,8 +875,12 @@
     }
 
     function showStandby() {
+      clearTimeout(fadeTimeout);
+
       standbyView.classList.remove("hidden");
+      standbyView.classList.remove("fade-out");
       liveView.classList.add("hidden");
+      liveView.classList.remove("fade-in");
       subtitleText.textContent = "Standby";
 
       currentPdfUrl = null;
@@ -746,12 +903,24 @@
       clearMsg();
       hidePopup();
       updatePageIndicator();
+      playStandbyVideo();
     }
 
     function showLive() {
-      standbyView.classList.add("hidden");
+      clearTimeout(fadeTimeout);
+
       liveView.classList.remove("hidden");
+      liveView.classList.add("fade-in");
+      standbyView.classList.remove("hidden");
+      standbyView.classList.add("fade-out");
       subtitleText.textContent = "Dokument geöffnet";
+
+      fadeTimeout = setTimeout(() => {
+        standbyView.classList.add("hidden");
+        liveView.classList.remove("fade-in");
+        standbyView.classList.remove("fade-out");
+        pauseStandbyVideos();
+      }, 450);
     }
 
     function applyMode(mode, session) {
