@@ -621,12 +621,6 @@
       preview.contentWindow.postMessage({ type, ...payload }, window.location.origin);
     }
 
-    function syncPreviewState(status) {
-      sendPreviewMessage("kiosk-status-update", {
-        status
-      });
-    }
-
     function buildStatusKey(status) {
       return JSON.stringify({
         active: !!status.active,
@@ -644,8 +638,8 @@
         loadPreview(false);
 
         const [statusRes, sessionRes] = await Promise.all([
-          fetch(`/api/status?screen=${currentScreen()}`),
-          fetch(`/api/session?screen=${currentScreen()}`)
+          fetch(`/api/status?screen=${currentScreen()}`, { cache: "no-store" }),
+          fetch(`/api/session?screen=${currentScreen()}`, { cache: "no-store" })
         ]);
 
         if (statusRes.status === 401 || sessionRes.status === 401) {
@@ -671,7 +665,10 @@
         const newKey = buildStatusKey(status);
 
         if (lastStatusKey && lastStatusKey !== newKey) {
-          syncPreviewState(status);
+          sendPreviewMessage("kiosk-status-update", {
+            screen: currentScreen(),
+            status
+          });
         }
 
         lastStatusKey = newKey;
@@ -686,9 +683,12 @@
         await saveSession();
         await uploadPdf();
         document.getElementById("file").value = "";
-        loadPreview(true);
         lastStatusKey = "";
         await loadStatus();
+        sendPreviewMessage("kiosk-status-update", {
+          screen: currentScreen(),
+          status: { active: true }
+        });
         setMessage("PDF wurde erfolgreich hochgeladen.", "ok");
       } catch (err) {
         setMessage(err.message || "Fehler beim Hochladen.", "err");
@@ -739,7 +739,6 @@
     });
 
     preview.addEventListener("load", () => {
-      lastStatusKey = "";
       setTimeout(() => {
         loadStatus();
       }, 200);
