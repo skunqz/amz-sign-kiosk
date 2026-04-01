@@ -539,7 +539,6 @@
           <video
             id="standbyVideo1"
             class="standby-video active"
-            autoplay
             muted
             playsinline
             preload="auto"
@@ -705,37 +704,133 @@
     let activeStandbyVideo = standbyVideo1;
     let inactiveStandbyVideo = standbyVideo2;
     let standbyCrossfading = false;
-    const STANDBY_CROSSFADE_MS = 1200;
-    const STANDBY_SWITCH_BUFFER = 1.4;
     let standbyMonitorTimer = null;
+
+    const STANDBY_CROSSFADE_MS = 1200;
+    const STANDBY_SWITCH_BUFFER = 1.2;
+
+    const standbyState = {
+      v1Ready: false,
+      v2Ready: false,
+      v1Failed: false,
+      v2Failed: false,
+      positions: {
+        standbyVideo1: 0,
+        standbyVideo2: 0
+      }
+    };
 
     titleText.textContent = `Kiosk – Screen ${screen}`;
     screenBadge.textContent = `Screen ${screen}`;
 
-    function setupVideoFallback(video) {
-      video.addEventListener("error", () => {
-        standbyFallback.classList.remove("hidden");
-      });
+    function videoId(video) {
+      return video.id;
     }
 
-    setupVideoFallback(standbyVideo1);
-    setupVideoFallback(standbyVideo2);
+    function markVideoReady(video) {
+      if (video === standbyVideo1) standbyState.v1Ready = true;
+      if (video === standbyVideo2) standbyState.v2Ready = true;
+      updateFallbackState();
+    }
 
-    function startStandbyMonitor() {
-      stopStandbyMonitor();
-      standbyMonitorTimer = setInterval(() => {
-        if (standbyCrossfading) return;
-        if (standbyView.classList.contains("hidden")) return;
+    function markVideoFailed(video) {
+      if (video === standbyVideo1) standbyState.v1Failed = true;
+      if (video === standbyVideo2) standbyState.v2Failed = true;
+      updateFallbackState();
+    }
 
-        const v = activeStandbyVideo;
-        if (!v || !isFinite(v.duration) || v.duration <= 0) return;
-        if (v.paused) return;
+    function isVideoFailed(video) {
+      if (video === standbyVideo1) return standbyState.v1Failed;
+      if (video === standbyVideo2) return standbyState.v2Failed;
+      return false;
+    }
 
-        const remaining = v.duration - v.currentTime;
-        if (remaining <= STANDBY_SWITCH_BUFFER) {
-          crossfadeToNextStandbyVideo();
+    function updateFallbackState() {
+      const bothFailed = standbyState.v1Failed && standbyState.v2Failed;
+      if (bothFailed) {
+        standbyFallback.classList.remove("hidden");
+      } else {
+        standbyFallback.classList.add("hidden");
+      }
+    }
+
+    function rememberVideoPosition(video) {
+      if (!video) return;
+      const id = videoId(video);
+      if (!id) return;
+      if (isFinite(video.currentTime) && video.currentTime >= 0) {
+        standbyState.positions[id] = video.currentTime;
+      }
+    }
+
+    function restoreVideoPosition(video) {
+      const id = videoId(video);
+      const saved = standbyState.positions[id] || 0;
+
+      try {
+        if (isFinite(saved) && saved > 0 && isFinite(video.duration) && video.duration > 0) {
+          video.currentTime = Math.min(saved, Math.max(0, video.duration - 0.25));
+        } else {
+          video.currentTime = 0;
         }
-      }, 200);
+      } catch (e) {
+        try {
+          video.currentTime = 0;
+        } catch (_) {}
+      }
+    }
+
+    function setupStandbyVideo(video) {
+      video.addEventListener("loadedmetadata", () => {
+        markVideoReady(video);
+      });
+
+      video.addEventListener("canplay", () => {
+        markVideoReady(video);
+      });
+
+      video.addEventListener("timeupdate", () => {
+        rememberVideoPosition(video);
+      });
+
+      video.addEventListener("pause", () => {
+        rememberVideoPosition(video);
+      });
+
+      video.addEventListener("ended", async () => {
+        rememberVideoPosition(video);
+        if (!standbyCrossfading && video === activeStandbyVideo) {
+          await crossfadeToNextStandbyVideo();
+        }
+      });
+
+      video.addEventListener("error", () => {
+        console.error("Standby-Video konnte nicht geladen werden:", video.currentSrc || video.src);
+        markVideoFailed(video);
+      });
+
+      video.load();
+    }
+
+    setupStandbyVideo(standbyVideo1);
+    setupStandbyVideo(standbyVideo2);
+
+    async function safePlayVideo(video) {
+      if (isVideoFailed(video)) return false;
+
+      try {
+        restoreVideoPosition(video);
+        await video.play();
+        return true;
+      } catch (e) {
+        console.error("Video konnte nicht abgespielt werden:", video.id, e);
+        return false;
+      }
+    }
+
+    function activateVideo(videoToShow, videoToHide) {
+      videoToShow.classList.add("active");
+      videoToHide.classList.remove("active");
     }
 
     function stopStandbyMonitor() {
@@ -745,75 +840,133 @@
       }
     }
 
-    async function crossfadeToNextStandbyVideo() {
-      if (standbyCrossfading) return;
-      standbyCrossfading = true;
+    function startStandbyMonitor() {
+      stopStandbyMonitor();
 
-      const oldVideo = activeStandbyVideo;
-      const nextVideo = inactiveStandbyVideo;
+      standbyMonitorTimer = setInterval(async () => {
+        if (standbyCrossfading) return;
+        if (standbyView.classList.contains("hidden")) return;
+        if (!activeStandbyVideo) return;
+        if (activeStandbyVideo.paused) return;
+        if (!isFinite(activeStandbyVideo.duration) || activeStandbyVideo.duration <= 0) return;
 
-      try {
-        nextVideo.currentTime = 0;
-        await nextVideo.play();
+        const remaining = activeStandbyVideo.duration - activeStandbyVideo.currentTime;
 
-        nextVideo.classList.add("active");
-        oldVideo.classList.remove("active");
-
-        window.setTimeout(() => {
-          try {
-            oldVideo.pause();
-            oldVideo.currentTime = 0;
-          } catch (e) {}
-        }, STANDBY_CROSSFADE_MS + 50);
-
-        inactiveStandbyVideo = oldVideo;
-        activeStandbyVideo = nextVideo;
-      } catch (e) {
-        standbyFallback.classList.remove("hidden");
-      } finally {
-        window.setTimeout(() => {
-          standbyCrossfading = false;
-        }, STANDBY_CROSSFADE_MS);
-      }
+        if (remaining <= STANDBY_SWITCH_BUFFER) {
+          await crossfadeToNextStandbyVideo();
+        }
+      }, 200);
     }
 
-    standbyVideo1.addEventListener("ended", () => {
-      if (!standbyCrossfading) {
-        crossfadeToNextStandbyVideo();
-      }
-    });
+    async function crossfadeToNextStandbyVideo() {
+      if (standbyCrossfading) return;
 
-    standbyVideo2.addEventListener("ended", () => {
-      if (!standbyCrossfading) {
-        crossfadeToNextStandbyVideo();
-      }
-    });
+      const oldVideo = activeStandbyVideo;
+      let nextVideo = inactiveStandbyVideo;
 
-    function playStandbyVideo() {
-      standbyFallback.classList.add("hidden");
-      standbyVideo1.classList.add("active");
-      standbyVideo2.classList.remove("active");
-      activeStandbyVideo = standbyVideo1;
-      inactiveStandbyVideo = standbyVideo2;
+      if (!nextVideo || isVideoFailed(nextVideo)) {
+        nextVideo = oldVideo === standbyVideo1 ? standbyVideo2 : standbyVideo1;
+      }
+
+      if (!nextVideo || isVideoFailed(nextVideo)) {
+        if (oldVideo) {
+          try {
+            oldVideo.currentTime = 0;
+            await oldVideo.play();
+          } catch (e) {}
+        }
+        return;
+      }
+
+      standbyCrossfading = true;
+
+      rememberVideoPosition(oldVideo);
+
+      const started = await safePlayVideo(nextVideo);
+
+      if (!started) {
+        standbyCrossfading = false;
+        if (oldVideo && !oldVideo.paused) return;
+
+        try {
+          restoreVideoPosition(oldVideo);
+          await oldVideo.play();
+        } catch (e) {}
+        return;
+      }
+
+      activateVideo(nextVideo, oldVideo);
+
+      window.setTimeout(() => {
+        try {
+          rememberVideoPosition(oldVideo);
+          oldVideo.pause();
+        } catch (e) {}
+      }, STANDBY_CROSSFADE_MS);
+
+      activeStandbyVideo = nextVideo;
+      inactiveStandbyVideo = oldVideo;
+
+      window.setTimeout(() => {
+        standbyCrossfading = false;
+      }, STANDBY_CROSSFADE_MS + 50);
+    }
+
+    async function playStandbyVideo() {
+      updateFallbackState();
+
       standbyCrossfading = false;
 
-      try {
-        standbyVideo2.pause();
-        standbyVideo2.currentTime = 0;
-      } catch (e) {}
+      let preferred = activeStandbyVideo;
+      if (!preferred || isVideoFailed(preferred)) {
+        preferred = !isVideoFailed(standbyVideo1) ? standbyVideo1 : standbyVideo2;
+      }
 
-      standbyVideo1.currentTime = 0;
-      standbyVideo1.play().then(() => {
-        startStandbyMonitor();
-      }).catch(() => {
+      if (!preferred || isVideoFailed(preferred)) {
         standbyFallback.classList.remove("hidden");
-      });
+        return;
+      }
+
+      const other = preferred === standbyVideo1 ? standbyVideo2 : standbyVideo1;
+
+      activeStandbyVideo = preferred;
+      inactiveStandbyVideo = other;
+
+      activateVideo(preferred, other);
+
+      const started = await safePlayVideo(preferred);
+
+      if (!started) {
+        const fallbackVideo = other;
+        if (!fallbackVideo || isVideoFailed(fallbackVideo)) {
+          standbyFallback.classList.remove("hidden");
+          return;
+        }
+
+        activeStandbyVideo = fallbackVideo;
+        inactiveStandbyVideo = preferred;
+        activateVideo(fallbackVideo, preferred);
+
+        const fallbackStarted = await safePlayVideo(fallbackVideo);
+        if (!fallbackStarted) {
+          standbyFallback.classList.remove("hidden");
+          return;
+        }
+      }
+
+      standbyFallback.classList.add("hidden");
+      startStandbyMonitor();
     }
 
     function pauseStandbyVideos() {
       stopStandbyMonitor();
-      try { standbyVideo1.pause(); } catch (e) {}
-      try { standbyVideo2.pause(); } catch (e) {}
+
+      [standbyVideo1, standbyVideo2].forEach(video => {
+        try {
+          rememberVideoPosition(video);
+          video.pause();
+        } catch (e) {}
+      });
     }
 
     function setMsg(text, type = "ok") {
