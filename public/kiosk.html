@@ -593,6 +593,7 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
     const STANDBY_LOGO = "/logo-portrait.png";
+    const channel = new BroadcastChannel("amz-kiosk-sync");
 
     const url = new URL(window.location.href);
     const screen = url.searchParams.get("screen") === "2" ? "2" : "1";
@@ -644,6 +645,8 @@
 
     let pollTimer = null;
     let pollPausedUntil = 0;
+    let applyingRemoteOverlay = false;
+    let suppressBroadcastUntil = 0;
 
     titleText.textContent = `Kiosk – Screen ${screen}`;
     screenBadge.textContent = `Screen ${screen}`;
@@ -702,6 +705,19 @@
         phone: session.phone || "",
         plate: session.plate || "",
         reason: session.reason || ""
+      });
+    }
+
+    function getDocumentKey(file, version) {
+      return `${file || ""}::${version || ""}`;
+    }
+
+    function broadcast(type, payload = {}) {
+      if (Date.now() < suppressBroadcastUntil) return;
+      channel.postMessage({
+        type,
+        screen,
+        ...payload
       });
     }
 
@@ -794,7 +810,51 @@
       return c;
     }
 
-    function setupDrawing(drawCanvas, overlayCanvas) {
+    function getPageState(index) {
+      return pageStates[index] || null;
+    }
+
+    function applyOverlayToPage(pageIndex, imageDataUrl) {
+      const state = getPageState(pageIndex);
+      if (!state || !state.overlayCanvas || !imageDataUrl) return;
+
+      const img = new Image();
+      img.onload = () => {
+        const overlayCtx = state.overlayCanvas.getContext("2d");
+        overlayCtx.clearRect(0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
+        overlayCtx.drawImage(img, 0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
+
+        const drawCanvas = pageFrame.querySelector(".draw-canvas");
+        if (drawCanvas && currentPage - 1 === pageIndex) {
+          const drawCtx = drawCanvas.getContext("2d");
+          drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+          drawCtx.drawImage(state.overlayCanvas, 0, 0);
+        }
+      };
+      img.src = imageDataUrl;
+    }
+
+    function broadcastOverlay(pageIndex) {
+      if (!isSignMode()) return;
+      const state = getPageState(pageIndex);
+      if (!state || !state.overlayCanvas) return;
+
+      broadcast("overlay-update", {
+        documentKey: getDocumentKey(currentPdfUrl, currentVersion),
+        mode: currentMode,
+        pageIndex,
+        image: state.overlayCanvas.toDataURL("image/png")
+      });
+    }
+
+    function broadcastClear(pageIndex) {
+      broadcast("overlay-clear", {
+        documentKey: getDocumentKey(currentPdfUrl, currentVersion),
+        pageIndex
+      });
+    }
+
+    function setupDrawing(drawCanvas, overlayCanvas, pageIndex) {
       const drawCtx = drawCanvas.getContext("2d");
       drawCtx.lineCap = "round";
       drawCtx.lineJoin = "round";
@@ -819,10 +879,14 @@
         };
       }
 
-      function persist() {
+      function persistAndBroadcast() {
         const overlayCtx = overlayCanvas.getContext("2d");
         overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
         overlayCtx.drawImage(drawCanvas, 0, 0);
+
+        if (!applyingRemoteOverlay) {
+          broadcastOverlay(pageIndex);
+        }
       }
 
       function start(event) {
@@ -839,13 +903,14 @@
         const p = getPos(event);
         drawCtx.lineTo(p.x, p.y);
         drawCtx.stroke();
+        persistAndBroadcast();
       }
 
       function end(event) {
         if (!drawing) return;
         event.preventDefault();
         drawing = false;
-        persist();
+        persistAndBroadcast();
       }
 
       drawCanvas.addEventListener("mousedown", start);
@@ -862,6 +927,9 @@
           drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
           const overlayCtx = overlayCanvas.getContext("2d");
           overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+          if (!applyingRemoteOverlay) {
+            broadcastClear(pageIndex);
+          }
         }
       };
     }
@@ -935,7 +1003,7 @@
       pageFrame.appendChild(wrap);
 
       if (drawCanvas) {
-        const tools = setupDrawing(drawCanvas, overlayCanvas);
+        const tools = setupDrawing(drawCanvas, overlayCanvas, index);
         drawCanvas._clearOverlay = tools.clear;
       }
 
@@ -943,11 +1011,45 @@
     }
 
     async function loadPdf(fileUrl) {
-      const loadingTask = pdfjsLib.getDocument(fileUrl);
+      const loadingTask = pdfjsLib.getDocument({
+        url: fileUrl,
+        disableAutoFetch: false,
+        disableStream: false,
+        disableRange: false
+      });
+
       pdfDoc = await loadingTask.promise;
       currentPage = 1;
       pageStates = new Array(pdfDoc.numPages).fill(null);
       await renderCurrentPage();
+    }
+
+    async function openDocumentState(data, forceRender = false) {
+      if (!data || data.status !== "ok" || !data.file) {
+        showStandby();
+        return;
+      }
+
+      const incomingSessionKey = sessionKey(data.session || null, data.mode);
+      const docChanged = currentPdfUrl !== data.file || currentVersion !== data.version;
+      const modeChanged = currentMode !== data.mode;
+      const sessionChanged = currentSessionKey !== incomingSessionKey;
+
+      if (docChanged || forceRender) {
+        currentPdfUrl = data.file;
+        currentVersion = data.version;
+        showLive();
+        applyMode(data.mode, data.session || null);
+        await loadPdf(`${data.file}?v=${data.version}`);
+        return;
+      }
+
+      if (modeChanged || sessionChanged) {
+        applyMode(data.mode, data.session || null);
+        if (pdfDoc && modeChanged) {
+          await renderCurrentPage();
+        }
+      }
     }
 
     async function goPrev() {
@@ -1018,6 +1120,10 @@
         showSuccessPopup("Erfolgreich verschickt", "Der Auftrag wurde erfolgreich per E-Mail versendet.");
         setMsg("Dokument wurde erfolgreich bestätigt.", "ok");
 
+        broadcast("document-signed", {
+          documentKey: getDocumentKey(currentPdfUrl, currentVersion)
+        });
+
         setTimeout(() => {
           hidePopup();
           showStandby();
@@ -1041,6 +1147,10 @@
         if (!res.ok || !data.success) {
           throw new Error(data.error || "Dokument konnte nicht geschlossen werden.");
         }
+
+        broadcast("document-closed", {
+          documentKey: getDocumentKey(currentPdfUrl, currentVersion)
+        });
 
         showStandby();
       } catch (error) {
@@ -1073,26 +1183,7 @@
         return;
       }
 
-      const incomingSessionKey = sessionKey(data.session || null, data.mode);
-      const docChanged = currentPdfUrl !== data.file || currentVersion !== data.version;
-      const modeChanged = currentMode !== data.mode;
-      const sessionChanged = currentSessionKey !== incomingSessionKey;
-
-      if (docChanged || forceRender) {
-        currentPdfUrl = data.file;
-        currentVersion = data.version;
-        showLive();
-        applyMode(data.mode, data.session || null);
-        await loadPdf(`${data.file}?v=${data.version}`);
-        return;
-      }
-
-      if (modeChanged || sessionChanged) {
-        applyMode(data.mode, data.session || null);
-        if (pdfDoc && modeChanged) {
-          await renderCurrentPage();
-        }
-      }
+      await openDocumentState(data, forceRender);
     }
 
     async function pollDocument(force = false) {
@@ -1127,11 +1218,65 @@
         return;
       }
 
+      if (data.type === "kiosk-open-document") {
+        pausePolling(1500);
+        if (data.document) {
+          await openDocumentState(data.document, true);
+        } else {
+          await pollDocument(true);
+        }
+        return;
+      }
+
       if (data.type === "kiosk-status-update") {
         pausePolling(1200);
         await pollDocument(true);
       }
     });
+
+    channel.onmessage = async (event) => {
+      const data = event.data || {};
+      if (String(data.screen) !== screen) return;
+
+      if (data.type === "overlay-update") {
+        if (data.documentKey !== getDocumentKey(currentPdfUrl, currentVersion)) return;
+        applyingRemoteOverlay = true;
+        suppressBroadcastUntil = Date.now() + 300;
+        applyOverlayToPage(data.pageIndex, data.image);
+        setTimeout(() => {
+          applyingRemoteOverlay = false;
+        }, 50);
+        return;
+      }
+
+      if (data.type === "overlay-clear") {
+        if (data.documentKey !== getDocumentKey(currentPdfUrl, currentVersion)) return;
+        const state = getPageState(data.pageIndex);
+        if (state && state.overlayCanvas) {
+          const ctx = state.overlayCanvas.getContext("2d");
+          ctx.clearRect(0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
+        }
+        const drawCanvas = pageFrame.querySelector(".draw-canvas");
+        if (drawCanvas && currentPage - 1 === data.pageIndex) {
+          const drawCtx = drawCanvas.getContext("2d");
+          drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+        }
+        return;
+      }
+
+      if (data.type === "document-closed") {
+        if (data.documentKey && data.documentKey !== getDocumentKey(currentPdfUrl, currentVersion)) return;
+        showStandby();
+        return;
+      }
+
+      if (data.type === "document-signed") {
+        if (data.documentKey && data.documentKey !== getDocumentKey(currentPdfUrl, currentVersion)) return;
+        setTimeout(() => {
+          showStandby();
+        }, 1000);
+      }
+    };
 
     document.getElementById("clearPageBtn").addEventListener("click", clearCurrentPage);
     document.getElementById("submitBtn").addEventListener("click", submitSignedDocument);
