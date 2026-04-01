@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AMZ-Kiosk v3</title>
+  <title>AMZ-Kiosk v4</title>
 
   <style>
     :root{
@@ -143,7 +143,7 @@
       background:#000;
       display:block;
       opacity:0;
-      transition:opacity 1.2s ease;
+      transition:opacity .35s ease;
       pointer-events:none;
     }
 
@@ -541,7 +541,7 @@
             class="standby-video active"
             muted
             playsinline
-            preload="auto"
+            preload="metadata"
           >
             <source src="/amz-mov.mp4" type="video/mp4" />
           </video>
@@ -551,7 +551,7 @@
             class="standby-video"
             muted
             playsinline
-            preload="auto"
+            preload="metadata"
           >
             <source src="/amz-mov2.mp4" type="video/mp4" />
           </video>
@@ -706,9 +706,8 @@
     let standbyCrossfading = false;
     let standbyMonitorTimer = null;
 
-    const STANDBY_CROSSFADE_MS = 1200;
-    const STANDBY_SWITCH_BUFFER = 1.2;
-    const VIDEO_END_RESET_THRESHOLD = 0.35;
+    const STANDBY_CROSSFADE_MS = 350;
+    const STANDBY_SWITCH_BUFFER = 0.25;
 
     const standbyState = {
       v1Ready: false,
@@ -759,44 +758,12 @@
       if (!video) return;
       const id = videoId(video);
       if (!id) return;
-      if (!isFinite(video.currentTime) || video.currentTime < 0) return;
-
-      const duration = video.duration;
-      if (isFinite(duration) && duration > 0) {
-        const remaining = duration - video.currentTime;
-
-        if (remaining <= VIDEO_END_RESET_THRESHOLD) {
-          standbyState.positions[id] = 0;
-          return;
-        }
-      }
-
-      standbyState.positions[id] = video.currentTime;
+      standbyState.positions[id] = 0;
     }
 
     function restoreVideoPosition(video) {
-      const id = videoId(video);
-      const saved = standbyState.positions[id] || 0;
-
       try {
-        if (!isFinite(saved) || saved <= 0) {
-          video.currentTime = 0;
-          return;
-        }
-
-        if (isFinite(video.duration) && video.duration > 0) {
-          const remaining = video.duration - saved;
-
-          if (remaining <= VIDEO_END_RESET_THRESHOLD) {
-            video.currentTime = 0;
-            standbyState.positions[id] = 0;
-            return;
-          }
-
-          video.currentTime = Math.max(0, Math.min(saved, video.duration - 0.5));
-        } else {
-          video.currentTime = saved;
-        }
+        video.currentTime = 0;
       } catch (e) {
         try {
           video.currentTime = 0;
@@ -805,6 +772,10 @@
     }
 
     function setupStandbyVideo(video) {
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = "auto";
+
       video.addEventListener("loadedmetadata", () => {
         markVideoReady(video);
       });
@@ -813,18 +784,10 @@
         markVideoReady(video);
       });
 
-      video.addEventListener("timeupdate", () => {
-        rememberVideoPosition(video);
-      });
-
-      video.addEventListener("pause", () => {
-        rememberVideoPosition(video);
-      });
-
       video.addEventListener("ended", async () => {
         standbyState.positions[video.id] = 0;
-
         try {
+          video.pause();
           video.currentTime = 0;
         } catch (e) {}
 
@@ -838,26 +801,28 @@
         markVideoFailed(video);
       });
 
-      video.load();
+      try {
+        video.load();
+      } catch (e) {}
     }
 
     setupStandbyVideo(standbyVideo1);
     setupStandbyVideo(standbyVideo2);
 
     async function safePlayVideo(video) {
-      if (isVideoFailed(video)) return false;
+      if (!video || isVideoFailed(video)) return false;
 
       try {
-        const duration = video.duration;
-        const current = video.currentTime;
+        video.pause();
+      } catch (e) {}
 
-        if (isFinite(duration) && duration > 0 && (duration - current) <= VIDEO_END_RESET_THRESHOLD) {
-          standbyState.positions[video.id] = 0;
-          video.currentTime = 0;
-        } else {
-          restoreVideoPosition(video);
-        }
+      try {
+        video.currentTime = 0;
+      } catch (e) {
+        restoreVideoPosition(video);
+      }
 
+      try {
         await video.play();
         return true;
       } catch (e) {
@@ -893,7 +858,7 @@
         if (remaining <= STANDBY_SWITCH_BUFFER) {
           await crossfadeToNextStandbyVideo();
         }
-      }, 200);
+      }, 500);
     }
 
     async function crossfadeToNextStandbyVideo() {
@@ -909,8 +874,8 @@
       if (!nextVideo || isVideoFailed(nextVideo)) {
         if (oldVideo) {
           try {
+            oldVideo.pause();
             oldVideo.currentTime = 0;
-            standbyState.positions[oldVideo.id] = 0;
             await oldVideo.play();
           } catch (e) {}
         }
@@ -919,19 +884,18 @@
 
       standbyCrossfading = true;
 
-      standbyState.positions[oldVideo.id] = 0;
-
       const started = await safePlayVideo(nextVideo);
 
       if (!started) {
         standbyCrossfading = false;
-        if (oldVideo && !oldVideo.paused) return;
 
-        try {
-          oldVideo.currentTime = 0;
-          standbyState.positions[oldVideo.id] = 0;
-          await oldVideo.play();
-        } catch (e) {}
+        if (oldVideo) {
+          try {
+            oldVideo.pause();
+            oldVideo.currentTime = 0;
+            await oldVideo.play();
+          } catch (e) {}
+        }
         return;
       }
 
@@ -941,7 +905,6 @@
         try {
           oldVideo.pause();
           oldVideo.currentTime = 0;
-          standbyState.positions[oldVideo.id] = 0;
         } catch (e) {}
       }, STANDBY_CROSSFADE_MS);
 
@@ -1009,8 +972,8 @@
 
       [standbyVideo1, standbyVideo2].forEach(video => {
         try {
-          rememberVideoPosition(video);
           video.pause();
+          video.currentTime = 0;
         } catch (e) {}
       });
     }
