@@ -40,51 +40,6 @@
       flex-direction:column;
     }
 
-    .topbar{
-      flex:0 0 auto;
-      height:72px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:16px;
-      padding:14px 18px;
-      background:#000;
-      border-bottom:1px solid #111827;
-      z-index:30;
-    }
-
-    .topbar-left{
-      min-width:0;
-      display:flex;
-      flex-direction:column;
-      gap:4px;
-    }
-
-    .title{
-      font-size:24px;
-      font-weight:800;
-      line-height:1.1;
-    }
-
-    .subtitle{
-      color:var(--muted);
-      font-size:15px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-
-    .screen-badge{
-      flex:0 0 auto;
-      padding:10px 14px;
-      border-radius:999px;
-      background:#111827;
-      border:1px solid #1f2937;
-      font-size:15px;
-      font-weight:700;
-      color:#fff;
-    }
-
     .main{
       flex:1 1 auto;
       min-height:0;
@@ -132,39 +87,16 @@
       background:#000;
       position:relative;
       overflow:hidden;
+      padding:0;
     }
 
-    .standby-video{
-      position:absolute;
-      inset:0;
+    .standby-logo{
       width:100%;
       height:100%;
-      object-fit:cover;
-      background:#000;
+      object-fit:contain;
       display:block;
-      opacity:0;
-      transition:opacity .35s ease;
+      user-select:none;
       pointer-events:none;
-    }
-
-    .standby-video.active{
-      opacity:1;
-    }
-
-    .standby-fallback{
-      width:100%;
-      height:100%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      background:#000;
-      color:#fff;
-      font-size:120px;
-      font-weight:800;
-      letter-spacing:2px;
-      position:absolute;
-      inset:0;
-      z-index:3;
     }
 
     .live{
@@ -512,8 +444,6 @@
     }
 
     @media (max-width: 900px){
-      .title{ font-size:21px; }
-      .subtitle{ font-size:14px; }
       .doc-stage{ padding:12px 78px; }
       .nav-btn{
         width:68px;
@@ -524,39 +454,17 @@
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <div class="topbar-left">
-      <div class="title" id="titleText">Kiosk</div>
-      <div class="subtitle" id="subtitleText">Standby</div>
-    </div>
-    <div class="screen-badge" id="screenBadge">Screen 1</div>
-  </div>
-
   <div class="main">
     <div id="standbyView" class="standby">
       <div class="standby-card">
         <div class="standby-logo-wrap">
-          <video
-            id="standbyVideo1"
-            class="standby-video active"
-            muted
-            playsinline
-            preload="metadata"
-          >
-            <source src="/amz-mov.mp4" type="video/mp4" />
-          </video>
-
-          <video
-            id="standbyVideo2"
-            class="standby-video"
-            muted
-            playsinline
-            preload="metadata"
-          >
-            <source src="/amz-mov2.mp4" type="video/mp4" />
-          </video>
-
-          <div id="standbyFallback" class="standby-fallback hidden">VIDEO</div>
+          <img
+            id="standbyLogo"
+            class="standby-logo"
+            src="/Logo2-Portrait.jpg"
+            alt="Logo"
+            draggable="false"
+          />
         </div>
       </div>
     </div>
@@ -651,13 +559,6 @@
 
     const standbyView = document.getElementById("standbyView");
     const liveView = document.getElementById("liveView");
-    const titleText = document.getElementById("titleText");
-    const subtitleText = document.getElementById("subtitleText");
-    const screenBadge = document.getElementById("screenBadge");
-
-    const standbyVideo1 = document.getElementById("standbyVideo1");
-    const standbyVideo2 = document.getElementById("standbyVideo2");
-    const standbyFallback = document.getElementById("standbyFallback");
 
     const pageFrame = document.getElementById("pageFrame");
     const pageIndicator = document.getElementById("pageIndicator");
@@ -700,283 +601,6 @@
     let applyingRemoteOverlay = false;
     let suppressBroadcastUntil = 0;
     let fadeTimeout = null;
-
-    let activeStandbyVideo = standbyVideo1;
-    let inactiveStandbyVideo = standbyVideo2;
-    let standbyCrossfading = false;
-    let standbyMonitorTimer = null;
-
-    const STANDBY_CROSSFADE_MS = 350;
-    const STANDBY_SWITCH_BUFFER = 0.25;
-
-    const standbyState = {
-      v1Ready: false,
-      v2Ready: false,
-      v1Failed: false,
-      v2Failed: false,
-      positions: {
-        standbyVideo1: 0,
-        standbyVideo2: 0
-      }
-    };
-
-    titleText.textContent = `Kiosk – Screen ${screen}`;
-    screenBadge.textContent = `Screen ${screen}`;
-
-    function videoId(video) {
-      return video.id;
-    }
-
-    function markVideoReady(video) {
-      if (video === standbyVideo1) standbyState.v1Ready = true;
-      if (video === standbyVideo2) standbyState.v2Ready = true;
-      updateFallbackState();
-    }
-
-    function markVideoFailed(video) {
-      if (video === standbyVideo1) standbyState.v1Failed = true;
-      if (video === standbyVideo2) standbyState.v2Failed = true;
-      updateFallbackState();
-    }
-
-    function isVideoFailed(video) {
-      if (video === standbyVideo1) return standbyState.v1Failed;
-      if (video === standbyVideo2) return standbyState.v2Failed;
-      return false;
-    }
-
-    function updateFallbackState() {
-      const bothFailed = standbyState.v1Failed && standbyState.v2Failed;
-      if (bothFailed) {
-        standbyFallback.classList.remove("hidden");
-      } else {
-        standbyFallback.classList.add("hidden");
-      }
-    }
-
-    function rememberVideoPosition(video) {
-      if (!video) return;
-      const id = videoId(video);
-      if (!id) return;
-      standbyState.positions[id] = 0;
-    }
-
-    function restoreVideoPosition(video) {
-      try {
-        video.currentTime = 0;
-      } catch (e) {
-        try {
-          video.currentTime = 0;
-        } catch (_) {}
-      }
-    }
-
-    function setupStandbyVideo(video) {
-      video.muted = true;
-      video.playsInline = true;
-      video.preload = "auto";
-
-      video.addEventListener("loadedmetadata", () => {
-        markVideoReady(video);
-      });
-
-      video.addEventListener("canplay", () => {
-        markVideoReady(video);
-      });
-
-      video.addEventListener("ended", async () => {
-        standbyState.positions[video.id] = 0;
-        try {
-          video.pause();
-          video.currentTime = 0;
-        } catch (e) {}
-
-        if (!standbyCrossfading && video === activeStandbyVideo) {
-          await crossfadeToNextStandbyVideo();
-        }
-      });
-
-      video.addEventListener("error", () => {
-        console.error("Standby-Video konnte nicht geladen werden:", video.currentSrc || video.src);
-        markVideoFailed(video);
-      });
-
-      try {
-        video.load();
-      } catch (e) {}
-    }
-
-    setupStandbyVideo(standbyVideo1);
-    setupStandbyVideo(standbyVideo2);
-
-    async function safePlayVideo(video) {
-      if (!video || isVideoFailed(video)) return false;
-
-      try {
-        video.pause();
-      } catch (e) {}
-
-      try {
-        video.currentTime = 0;
-      } catch (e) {
-        restoreVideoPosition(video);
-      }
-
-      try {
-        await video.play();
-        return true;
-      } catch (e) {
-        console.error("Video konnte nicht abgespielt werden:", video.id, e);
-        return false;
-      }
-    }
-
-    function activateVideo(videoToShow, videoToHide) {
-      videoToShow.classList.add("active");
-      videoToHide.classList.remove("active");
-    }
-
-    function stopStandbyMonitor() {
-      if (standbyMonitorTimer) {
-        clearInterval(standbyMonitorTimer);
-        standbyMonitorTimer = null;
-      }
-    }
-
-    function startStandbyMonitor() {
-      stopStandbyMonitor();
-
-      standbyMonitorTimer = setInterval(async () => {
-        if (standbyCrossfading) return;
-        if (standbyView.classList.contains("hidden")) return;
-        if (!activeStandbyVideo) return;
-        if (activeStandbyVideo.paused) return;
-        if (!isFinite(activeStandbyVideo.duration) || activeStandbyVideo.duration <= 0) return;
-
-        const remaining = activeStandbyVideo.duration - activeStandbyVideo.currentTime;
-
-        if (remaining <= STANDBY_SWITCH_BUFFER) {
-          await crossfadeToNextStandbyVideo();
-        }
-      }, 500);
-    }
-
-    async function crossfadeToNextStandbyVideo() {
-      if (standbyCrossfading) return;
-
-      const oldVideo = activeStandbyVideo;
-      let nextVideo = inactiveStandbyVideo;
-
-      if (!nextVideo || isVideoFailed(nextVideo)) {
-        nextVideo = oldVideo === standbyVideo1 ? standbyVideo2 : standbyVideo1;
-      }
-
-      if (!nextVideo || isVideoFailed(nextVideo)) {
-        if (oldVideo) {
-          try {
-            oldVideo.pause();
-            oldVideo.currentTime = 0;
-            await oldVideo.play();
-          } catch (e) {}
-        }
-        return;
-      }
-
-      standbyCrossfading = true;
-
-      const started = await safePlayVideo(nextVideo);
-
-      if (!started) {
-        standbyCrossfading = false;
-
-        if (oldVideo) {
-          try {
-            oldVideo.pause();
-            oldVideo.currentTime = 0;
-            await oldVideo.play();
-          } catch (e) {}
-        }
-        return;
-      }
-
-      activateVideo(nextVideo, oldVideo);
-
-      window.setTimeout(() => {
-        try {
-          oldVideo.pause();
-          oldVideo.currentTime = 0;
-        } catch (e) {}
-      }, STANDBY_CROSSFADE_MS);
-
-      activeStandbyVideo = nextVideo;
-      inactiveStandbyVideo = oldVideo;
-
-      window.setTimeout(() => {
-        standbyCrossfading = false;
-      }, STANDBY_CROSSFADE_MS + 50);
-    }
-
-    async function playStandbyVideo() {
-      updateFallbackState();
-
-      standbyCrossfading = false;
-
-      let preferred = activeStandbyVideo;
-      if (!preferred || isVideoFailed(preferred)) {
-        preferred = !isVideoFailed(standbyVideo1) ? standbyVideo1 : standbyVideo2;
-      }
-
-      if (!preferred || isVideoFailed(preferred)) {
-        standbyFallback.classList.remove("hidden");
-        return;
-      }
-
-      const other = preferred === standbyVideo1 ? standbyVideo2 : standbyVideo1;
-
-      activeStandbyVideo = preferred;
-      inactiveStandbyVideo = other;
-
-      try {
-        other.pause();
-        other.currentTime = 0;
-      } catch (e) {}
-
-      activateVideo(preferred, other);
-
-      const started = await safePlayVideo(preferred);
-
-      if (!started) {
-        const fallbackVideo = other;
-        if (!fallbackVideo || isVideoFailed(fallbackVideo)) {
-          standbyFallback.classList.remove("hidden");
-          return;
-        }
-
-        activeStandbyVideo = fallbackVideo;
-        inactiveStandbyVideo = preferred;
-        activateVideo(fallbackVideo, preferred);
-
-        const fallbackStarted = await safePlayVideo(fallbackVideo);
-        if (!fallbackStarted) {
-          standbyFallback.classList.remove("hidden");
-          return;
-        }
-      }
-
-      standbyFallback.classList.add("hidden");
-      startStandbyMonitor();
-    }
-
-    function pauseStandbyVideos() {
-      stopStandbyMonitor();
-
-      [standbyVideo1, standbyVideo2].forEach(video => {
-        try {
-          video.pause();
-          video.currentTime = 0;
-        } catch (e) {}
-      });
-    }
 
     function setMsg(text, type = "ok") {
       msg.className = `msg show ${type}`;
@@ -1043,7 +667,6 @@
       standbyView.classList.remove("fade-out");
       liveView.classList.add("hidden");
       liveView.classList.remove("fade-in");
-      subtitleText.textContent = "Standby";
 
       currentPdfUrl = null;
       currentVersion = null;
@@ -1065,7 +688,6 @@
       clearMsg();
       hidePopup();
       updatePageIndicator();
-      playStandbyVideo();
     }
 
     function showLive() {
@@ -1075,13 +697,11 @@
       liveView.classList.add("fade-in");
       standbyView.classList.remove("hidden");
       standbyView.classList.add("fade-out");
-      subtitleText.textContent = "Dokument geöffnet";
 
       fadeTimeout = setTimeout(() => {
         standbyView.classList.add("hidden");
         liveView.classList.remove("fade-in");
         standbyView.classList.remove("fade-out");
-        pauseStandbyVideos();
       }, 450);
     }
 
